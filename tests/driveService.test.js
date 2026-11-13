@@ -5,11 +5,11 @@ import { summarizeReceipts } from "../src/driveService.js";
 
 test("deve contar quatro comprovantes no mesmo dia", () => {
   const filenames = [
-    "Comprovante_Ponto_Mobile_1770416909454.jpg",
-    "Comprovante_Ponto_Mobile_1770420509454.jpg",
-    "Comprovante_Ponto_Mobile_1770431309454.jpg",
-    "Comprovante_Ponto_Mobile_1770434909454.jpg"
-  ];
+  "Comprovante_Ponto_Mobile_1770416909454.jpg",
+  "Comprovante_Ponto_Mobile_1770420509454.jpg",
+  "Comprovante_Ponto_Mobile_1770424109454.jpg",
+  "Comprovante_Ponto_Mobile_1770427709454.jpg"
+    ];
 
   const result = summarizeReceipts(filenames);
 
