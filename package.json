@@ -1,0 +1,15 @@
+
+{
+  "name": "pontoguard",
+    "version": "1.0.0",
+      "description": "Automated attendance proof verification system",
+        "type": "module",
+          "scripts": {
+              "test": "node --test"
+                },
+                  "engines": {
+                      "node": ">=20"
+                        },
+                          "license": "MIT"
+                          }
+                          
