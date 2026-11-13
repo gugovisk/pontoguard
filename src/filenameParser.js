@@ -50,4 +50,3 @@ const FILE_PATTERN =
                                                                                                 time: timeFormatter.format(date)
                                                                                                   };
                                                                                                   }
-                                                                                                  w
