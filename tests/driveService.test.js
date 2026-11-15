@@ -78,18 +78,3 @@ test("deve contar timestamps duplicados apenas uma vez", () => {
   assert.equal(result.ignoredFiles, 0);
   assert.equal(result.duplicateFiles, 1);
 });
-
-test("deve contar timestamps duplicados apenas uma vez", () => {
-  const filenames = [
-    "Comprovante_Ponto_Mobile_1770416909454.jpg",
-    "Comprovante_Ponto_Mobile_1770416909454.png",
-    "Comprovante_Ponto_Mobile_1770420509454.jpg"
-  ];
-
-  const result = summarizeReceipts(filenames);
-
-  assert.equal(result.byDate["2026-02-06"], 2);
-  assert.equal(result.totalReceipts, 2);
-  assert.equal(result.ignoredFiles, 0);
-  assert.equal(result.duplicateFiles, 1);
-});
