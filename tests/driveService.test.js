@@ -16,6 +16,7 @@ test("deve contar quatro comprovantes no mesmo dia", () => {
   assert.equal(result.byDate["2026-02-06"], 4);
   assert.equal(result.totalReceipts, 4);
   assert.equal(result.ignoredFiles, 0);
+  assert.equal(result.duplicateFiles, 0);
 });
 
 test("deve separar comprovantes de datas diferentes", () => {
@@ -28,6 +29,7 @@ test("deve separar comprovantes de datas diferentes", () => {
 
   assert.equal(result.byDate["2026-02-06"], 1);
   assert.equal(result.byDate["2026-02-07"], 1);
+  assert.equal(result.duplicateFiles, 0);
 });
 
 test("deve ignorar arquivos com nomes inválidos", () => {
@@ -41,6 +43,7 @@ test("deve ignorar arquivos com nomes inválidos", () => {
 
   assert.equal(result.totalReceipts, 1);
   assert.equal(result.ignoredFiles, 2);
+  assert.equal(result.duplicateFiles, 0);
 });
 
 test("deve retornar resultado vazio para lista vazia", () => {
@@ -49,7 +52,8 @@ test("deve retornar resultado vazio para lista vazia", () => {
   assert.deepEqual(result, {
     byDate: {},
     totalReceipts: 0,
-    ignoredFiles: 0
+    ignoredFiles: 0,
+    duplicateFiles: 0
   });
 });
 
@@ -58,4 +62,34 @@ test("deve rejeitar entradas que não sejam listas", () => {
     () => summarizeReceipts(null),
     TypeError
   );
+});
+
+test("deve contar timestamps duplicados apenas uma vez", () => {
+  const filenames = [
+    "Comprovante_Ponto_Mobile_1770416909454.jpg",
+    "Comprovante_Ponto_Mobile_1770416909454.png",
+    "Comprovante_Ponto_Mobile_1770420509454.jpg"
+  ];
+
+  const result = summarizeReceipts(filenames);
+
+  assert.equal(result.byDate["2026-02-06"], 2);
+  assert.equal(result.totalReceipts, 2);
+  assert.equal(result.ignoredFiles, 0);
+  assert.equal(result.duplicateFiles, 1);
+});
+
+test("deve contar timestamps duplicados apenas uma vez", () => {
+  const filenames = [
+    "Comprovante_Ponto_Mobile_1770416909454.jpg",
+    "Comprovante_Ponto_Mobile_1770416909454.png",
+    "Comprovante_Ponto_Mobile_1770420509454.jpg"
+  ];
+
+  const result = summarizeReceipts(filenames);
+
+  assert.equal(result.byDate["2026-02-06"], 2);
+  assert.equal(result.totalReceipts, 2);
+  assert.equal(result.ignoredFiles, 0);
+  assert.equal(result.duplicateFiles, 1);
 });
