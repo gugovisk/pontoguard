@@ -195,3 +195,195 @@ test("não deve registrar notificação quando o envio falha", () => {
     "telegram"
   ]);
 });
+
+test("deve interromper o fluxo quando o Google Agenda falha", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      throw new Error("Calendar unavailable");
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 0;
+    },
+
+    hasAlreadyNotified: () => false,
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.throws(workflow, /Calendar unavailable/);
+  assert.deepEqual(calls, ["calendar"]);
+});
+
+test("deve rejeitar resposta inválida do Google Agenda", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return "false";
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 0;
+    },
+
+    hasAlreadyNotified: () => false,
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.throws(workflow, /isDayOff must return a boolean/);
+  assert.deepEqual(calls, ["calendar"]);
+});
+
+test("deve interromper o fluxo quando o Google Drive falha", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      throw new Error("Drive unavailable");
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      return false;
+    },
+
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.throws(workflow, /Drive unavailable/);
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive"
+  ]);
+});
+
+test("deve rejeitar quantidade inválida retornada pelo Drive", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return -1;
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      return false;
+    },
+
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.throws(workflow, RangeError);
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive"
+  ]);
+});
+
+test("deve interromper o fluxo quando falha a consulta de notificação anterior", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 3;
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      throw new Error("Notification storage unavailable");
+    },
+
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.throws(workflow, /Notification storage unavailable/);
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive",
+    "notification-check"
+  ]);
+});
+
+test("deve propagar falha ao registrar notificação após o envio", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 3;
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      return false;
+    },
+
+    sendReminder: () => {
+      calls.push("telegram");
+    },
+
+    markAsNotified: () => {
+      calls.push("register");
+      throw new Error("Notification registration failed");
+    }
+  });
+
+  assert.throws(workflow, /Notification registration failed/);
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive",
+    "notification-check",
+    "telegram",
+    "register"
+  ]);
+});
