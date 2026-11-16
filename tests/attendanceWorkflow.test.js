@@ -48,3 +48,150 @@ test("não deve enviar lembrete quando existem quatro comprovantes", () => {
     "drive"
   ]);
 });
+
+test("não deve consultar o Drive em dia de folga", () => {
+  const calls = [];
+
+  const result = runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return true;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 0;
+    },
+
+    hasAlreadyNotified: () => false,
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.equal(result.status, "day_off");
+  assert.deepEqual(calls, ["calendar"]);
+});
+
+test("deve enviar e registrar lembrete com três comprovantes", () => {
+  const calls = [];
+  let sentMessage;
+
+  const result = runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 3;
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      return false;
+    },
+
+    sendReminder: (message) => {
+      calls.push("telegram");
+      sentMessage = message;
+    },
+
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.equal(result.status, "reminder_sent");
+  assert.equal(result.notificationSent, true);
+
+  assert.deepEqual(sentMessage, {
+    date: "2026-11-16",
+    receiptCount: 3,
+    expectedCount: 4
+  });
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive",
+    "notification-check",
+    "telegram",
+    "register"
+  ]);
+});
+
+test("não deve repetir um lembrete já enviado", () => {
+  const calls = [];
+
+  const result = runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 2;
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      return true;
+    },
+
+    sendReminder: () => calls.push("telegram"),
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.equal(result.status, "already_notified");
+  assert.equal(result.notificationSent, false);
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive",
+    "notification-check"
+  ]);
+});
+
+test("não deve registrar notificação quando o envio falha", () => {
+  const calls = [];
+
+  const workflow = () => runAttendanceWorkflow({
+    date: "2026-11-16",
+
+    isDayOff: () => {
+      calls.push("calendar");
+      return false;
+    },
+
+    getReceiptCount: () => {
+      calls.push("drive");
+      return 2;
+    },
+
+    hasAlreadyNotified: () => {
+      calls.push("notification-check");
+      return false;
+    },
+
+    sendReminder: () => {
+      calls.push("telegram");
+      throw new Error("Telegram unavailable");
+    },
+
+    markAsNotified: () => calls.push("register")
+  });
+
+  assert.throws(workflow, /Telegram unavailable/);
+
+  assert.deepEqual(calls, [
+    "calendar",
+    "drive",
+    "notification-check",
+    "telegram"
+  ]);
+});
