@@ -7,7 +7,7 @@ PontoGuard is a personal automation project designed to verify attendance punch 
 
 The project combines JavaScript, automated testing, Google Apps Script, Google services, and Telegram notifications.
 
-It is also a practical software development portfolio project focused on modular architecture, testing, continuous integration, and real-world automation.
+It is also a practical software development portfolio project focused on modular architecture, software testing, continuous integration, notification reliability, and real-world automation.
 
 ## 1. Project Objective
 
@@ -28,7 +28,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core development, workflow orchestration, and simulated resilience testing.**
+**Current stage: Core development, workflow orchestration, automated resilience testing, and notification state modeling.**
 
 ### Implemented in the GitHub repository
 
@@ -40,9 +40,11 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 - [x] Invalid filename handling
 - [x] Attendance reminder decision rules
 - [x] Workflow orchestration with injected dependencies
-- [x] Automated unit tests
 - [x] Simulated workflow tests
 - [x] Workflow resilience tests
+- [x] Notification lifecycle state model
+- [x] Notification state transition validation
+- [x] Automated unit tests
 - [x] GitHub Actions continuous integration
 
 ### Validated separately using Google Apps Script
@@ -55,15 +57,22 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ### Not yet enabled or completed
 
+- [ ] Implement persistent notification state storage
+- [ ] Add concurrency control for notification processing
+- [ ] Integrate notification state management into the attendance workflow
 - [ ] Connect the Node.js workflow to real Google service adapters
 - [ ] Add sanitized Apps Script source code to this repository
-- [ ] Improve notification idempotency and recovery
+- [ ] Implement safe notification recovery and reconciliation
 - [ ] Improve handling of delayed file synchronization
 - [ ] Configure the automatic daily trigger
 - [ ] Implement additional operational monitoring
 - [ ] Expand automated testing for real service integrations
 
-**Important:** Automated workflow tests use simulated dependencies. They do not make real Google or Telegram API requests. The Google Apps Script implementation remains in a separate personal project, and daily scheduled execution has not been activated.
+**Important:** The notification state machine currently defines and validates permitted state transitions, but it does not yet provide persistent storage or concurrency control.
+
+Automated workflow tests use simulated dependencies. They do not make real Google or Telegram API requests.
+
+The Google Apps Script implementation remains in a separate personal project, and daily scheduled execution has not been activated.
 
 ## 3. How It Works
 
@@ -80,7 +89,7 @@ The intended operational workflow is:
 
 The Google Apps Script prototype checks the day-off condition before processing receipts.
 
-The Node.js workflow separately implements the attendance decision and orchestration rules using injected dependencies, which allows automated tests to simulate external services.
+The Node.js core separately implements attendance decision rules, workflow orchestration, and notification state management.
 
 ## 4. Business Rules
 
@@ -158,7 +167,7 @@ The function validates its inputs and can be tested independently without extern
 
 ### Attendance Workflow
 
-The `runAttendanceWorkflow()` function coordinates the attendance verification process through injected dependencies.
+The `runAttendanceWorkflow()` function coordinates attendance verification through injected dependencies.
 
 Its responsibilities include:
 
@@ -169,7 +178,38 @@ Its responsibilities include:
 5. Requesting notification delivery.
 6. Recording the notification after successful delivery.
 
-The workflow is designed to receive service functions as dependencies, allowing simulated implementations to be used during automated testing.
+The workflow receives service functions as dependencies, allowing simulated implementations to be used during automated testing.
+
+### Notification State Machine
+
+The `notificationState.js` module defines four notification lifecycle states:
+
+| State | Description |
+|---|---|
+| `SENDING` | Notification delivery has started |
+| `SENT` | Notification delivery was confirmed |
+| `FAILED` | Delivery failure was confirmed |
+| `UNKNOWN` | Delivery result is uncertain |
+
+The `canTransitionNotification()` function validates permitted state transitions.
+
+The implemented transition rules include:
+
+| Current state | Next state | Allowed |
+|---|---|---|
+| New notification | `SENDING` | Yes |
+| `SENDING` | `SENT` | Yes |
+| `SENDING` | `FAILED` | Yes |
+| `SENDING` | `UNKNOWN` | Yes |
+| `FAILED` | `SENDING` | Yes |
+| `UNKNOWN` | `SENT` | Yes |
+| `UNKNOWN` | `FAILED` | Yes, after reconciliation |
+| `SENT` | `SENDING` | No |
+| `UNKNOWN` | `SENDING` | No |
+
+An uncertain notification must be reconciled before another delivery attempt.
+
+**Current limitation:** The state machine is currently an independent module. Persistent storage, concurrency control, and integration with the attendance workflow remain future improvements.
 
 ## 6. Technologies
 
@@ -204,13 +244,15 @@ pontoguard/
 │   ├── filenameParser.js
 │   ├── driveService.js
 │   ├── attendanceRules.js
-│   └── attendanceWorkflow.js
+│   ├── attendanceWorkflow.js
+│   └── notificationState.js
 │
 ├── tests/
 │   ├── filenameParser.test.js
 │   ├── driveService.test.js
 │   ├── attendanceRules.test.js
-│   └── attendanceWorkflow.test.js
+│   ├── attendanceWorkflow.test.js
+│   └── notificationState.test.js
 │
 ├── .gitignore
 ├── LICENSE
@@ -226,10 +268,12 @@ pontoguard/
 | `driveService.js` | Receipt summarization and duplicate detection |
 | `attendanceRules.js` | Attendance reminder decision rules and input validation |
 | `attendanceWorkflow.js` | Attendance verification orchestration using injected dependencies |
+| `notificationState.js` | Notification states and transition validation |
 | `filenameParser.test.js` | Parser unit tests |
 | `driveService.test.js` | Receipt processing unit tests |
 | `attendanceRules.test.js` | Attendance decision rule tests |
 | `attendanceWorkflow.test.js` | Simulated workflow and resilience tests |
+| `notificationState.test.js` | Notification state transition tests |
 | `tests.yml` | GitHub Actions workflow |
 
 ## 8. Requirements
@@ -266,7 +310,7 @@ The project uses Node.js's built-in Test Runner and the `node:assert/strict` mod
 
 ### Test Scenarios
 
-The automated test suite covers:
+The automated test suite currently contains 48 tests.
 
 **Filename and receipt processing**
 
@@ -303,7 +347,16 @@ The automated test suite covers:
 - Notification storage lookup failures.
 - Notification registration failures after message delivery.
 
-Workflow tests use injected functions to simulate external dependencies. They do not make real API requests.
+**Notification state management**
+
+- Creating a new notification in `SENDING`.
+- Validating transitions to `SENT`, `FAILED`, and `UNKNOWN`.
+- Allowing retries after confirmed failures.
+- Preventing repeated sending after confirmed delivery.
+- Blocking automatic retries when delivery is uncertain.
+- Rejecting invalid notification states.
+
+Workflow and notification state tests use isolated functions and simulated dependencies. They do not make real API requests.
 
 ## 10. Continuous Integration
 
@@ -372,8 +425,10 @@ The current implementation has some known limitations:
 - The Apps Script prototype currently uses the default Google Calendar.
 - Delayed file synchronization may temporarily cause an undercount.
 - The Node.js workflow is not yet connected to real Google service adapters.
-- The Apps Script source is not yet versioned in this repository.
-- A successful Telegram delivery followed by a failed notification record may lead to a repeated notification on a later execution.
+- The notification state machine does not yet have persistent storage.
+- Notification state transitions are not yet protected by concurrency control.
+- The notification state model is not yet connected to the attendance workflow.
+- An uncertain Telegram delivery result requires reconciliation before retrying.
 - The daily scheduled trigger has not been activated.
 - Real external service integrations do not yet have automated CI coverage.
 
@@ -390,9 +445,15 @@ These limitations are being addressed incrementally.
 - [x] Implement workflow orchestration with injected dependencies.
 - [x] Add simulated workflow tests for normal scenarios.
 - [x] Add simulated workflow resilience tests.
+- [x] Define notification lifecycle states.
+- [x] Validate permitted notification state transitions.
+- [x] Add automated notification state tests.
+- [ ] Implement persistent notification state storage.
+- [ ] Add concurrency control for notification processing.
+- [ ] Integrate notification state management into the attendance workflow.
 - [ ] Develop adapters for real Google service integration.
 - [ ] Add sanitized Apps Script source code to the repository.
-- [ ] Improve notification idempotency and recovery.
+- [ ] Implement safe notification recovery and reconciliation.
 - [ ] Improve synchronization delay handling.
 - [ ] Configure and validate scheduled execution.
 - [ ] Improve monitoring and error handling.
@@ -405,4 +466,4 @@ See the `LICENSE` file for details.
 
 ---
 
-**PontoGuard** is an ongoing portfolio project focused on practical software development, problem-solving, code quality, automated testing, and automation.
+**PontoGuard** is an ongoing portfolio project focused on practical software development, problem-solving, code quality, automated testing, and reliable automation.
