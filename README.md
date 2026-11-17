@@ -1,4 +1,3 @@
-
 # PontoGuard
 
 **Automated Attendance Receipt Verification and Notification System**
@@ -28,49 +27,54 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core development, workflow orchestration, automated resilience testing, and notification state modeling.**
+**Current stage: Core development, workflow orchestration, notification state modeling, storage abstraction, and automated testing.**
 
 ### Implemented in the GitHub repository
 
-- [x] Filename timestamp parser
-- [x] Unix timestamp conversion
-- [x] `America/Sao_Paulo` timezone handling
-- [x] Receipt grouping by date
-- [x] Duplicate timestamp detection
-- [x] Invalid filename handling
-- [x] Attendance reminder decision rules
-- [x] Workflow orchestration with injected dependencies
-- [x] Simulated workflow tests
-- [x] Workflow resilience tests
-- [x] Notification lifecycle state model
-- [x] Notification state transition validation
-- [x] Automated unit tests
-- [x] GitHub Actions continuous integration
+- [x] Filename timestamp parser.
+- [x] Unix timestamp conversion.
+- [x] `America/Sao_Paulo` timezone handling.
+- [x] Receipt grouping by date.
+- [x] Duplicate timestamp detection.
+- [x] Invalid filename handling.
+- [x] Attendance reminder decision rules.
+- [x] Workflow orchestration with injected dependencies.
+- [x] Simulated workflow tests.
+- [x] Workflow resilience tests.
+- [x] Notification lifecycle state model.
+- [x] Notification state transition validation.
+- [x] Notification storage abstraction with an injectable adapter.
+- [x] Notification record creation, retrieval, and saving.
+- [x] Notification record validation.
+- [x] Notification state transitions through the storage module.
+- [x] Retry attempt tracking after confirmed failures.
+- [x] Automated unit tests.
+- [x] GitHub Actions continuous integration.
 
 ### Validated separately using Google Apps Script
 
-- [x] Google Drive folder reading
-- [x] Receipt counting and timestamp deduplication
-- [x] Google Calendar day-off verification
-- [x] Telegram Bot API message delivery
-- [x] Integrated historical validation scenarios
+- [x] Google Drive folder reading.
+- [x] Receipt counting and timestamp deduplication.
+- [x] Google Calendar day-off verification.
+- [x] Telegram Bot API message delivery.
+- [x] Integrated historical validation scenarios.
 
 ### Not yet enabled or completed
 
-- [ ] Implement persistent notification state storage
-- [ ] Add concurrency control for notification processing
-- [ ] Integrate notification state management into the attendance workflow
-- [ ] Connect the Node.js workflow to real Google service adapters
-- [ ] Add sanitized Apps Script source code to this repository
-- [ ] Implement safe notification recovery and reconciliation
-- [ ] Improve handling of delayed file synchronization
-- [ ] Configure the automatic daily trigger
-- [ ] Implement additional operational monitoring
-- [ ] Expand automated testing for real service integrations
+- [ ] Connect the notification storage abstraction to Google Apps Script `PropertiesService`.
+- [ ] Integrate notification state management into the real attendance workflow.
+- [ ] Add concurrency control for notification processing.
+- [ ] Implement safe notification recovery and reconciliation.
+- [ ] Connect the Node.js workflow to real Google service adapters.
+- [ ] Add sanitized Apps Script source code to this repository.
+- [ ] Improve handling of delayed file synchronization.
+- [ ] Configure the automatic daily trigger.
+- [ ] Implement additional operational monitoring.
+- [ ] Expand automated testing for real service integrations.
 
-**Important:** The notification state machine currently defines and validates permitted state transitions, but it does not yet provide persistent storage or concurrency control.
+**Important:** The notification storage module currently provides storage operations through an injected adapter. Its automated tests use an in-memory implementation. Actual persistent storage through Google Apps Script PropertiesService has not yet been connected.
 
-Automated workflow tests use simulated dependencies. They do not make real Google or Telegram API requests.
+Automated workflow and storage tests use simulated dependencies. They do not make real Google or Telegram API requests.
 
 The Google Apps Script implementation remains in a separate personal project, and daily scheduled execution has not been activated.
 
@@ -89,7 +93,7 @@ The intended operational workflow is:
 
 The Google Apps Script prototype checks the day-off condition before processing receipts.
 
-The Node.js core separately implements attendance decision rules, workflow orchestration, and notification state management.
+The Node.js core separately implements attendance decision rules, workflow orchestration, notification state management, and notification storage operations.
 
 ## 4. Business Rules
 
@@ -209,7 +213,42 @@ The implemented transition rules include:
 
 An uncertain notification must be reconciled before another delivery attempt.
 
-**Current limitation:** The state machine is currently an independent module. Persistent storage, concurrency control, and integration with the attendance workflow remain future improvements.
+### Notification Storage
+
+The `notificationStore.js` module provides an injectable storage abstraction for notification records.
+
+Its main operations are:
+
+- `getNotificationRecord()`: retrieves a notification record using its date.
+- `saveNotificationRecord()`: validates and saves a notification record.
+- `createNotificationRecord()`: creates a new notification record in the `SENDING` state.
+- `transitionNotification()`: changes the notification state while respecting the state machine rules.
+
+Each record is identified by a date-based key:
+
+`PONTOGUARD_NOTIFICATION_YYYY-MM-DD`
+
+The record includes:
+
+- Schema version.
+- Attendance date.
+- Notification status.
+- Number of attempts.
+- Creation timestamp.
+- Last update timestamp.
+- Last attempt timestamp.
+- Successful delivery timestamp, when applicable.
+- Last recorded error, when applicable.
+
+The storage module validates record structure, notification status, date format, attempt count, and stored JSON.
+
+Retry attempts are incremented when a notification transitions from `FAILED` back to `SENDING`.
+
+The module prevents an automatic transition from `UNKNOWN` directly to `SENDING`. Reconciliation is required before another delivery attempt.
+
+Automated tests use an in-memory storage adapter that simulates the `getProperty()` and `setProperty()` interface.
+
+**Current limitation:** The storage abstraction is implemented and tested, but it is not yet connected to Google Apps Script PropertiesService. Persistent production storage, concurrency control, and workflow integration remain pending.
 
 ## 6. Technologies
 
@@ -245,14 +284,16 @@ pontoguard/
 │   ├── driveService.js
 │   ├── attendanceRules.js
 │   ├── attendanceWorkflow.js
-│   └── notificationState.js
+│   ├── notificationState.js
+│   └── notificationStore.js
 │
 ├── tests/
 │   ├── filenameParser.test.js
 │   ├── driveService.test.js
 │   ├── attendanceRules.test.js
 │   ├── attendanceWorkflow.test.js
-│   └── notificationState.test.js
+│   ├── notificationState.test.js
+│   └── notificationStore.test.js
 │
 ├── .gitignore
 ├── LICENSE
@@ -269,18 +310,20 @@ pontoguard/
 | `attendanceRules.js` | Attendance reminder decision rules and input validation |
 | `attendanceWorkflow.js` | Attendance verification orchestration using injected dependencies |
 | `notificationState.js` | Notification states and transition validation |
+| `notificationStore.js` | Notification record storage abstraction and state transitions |
 | `filenameParser.test.js` | Parser unit tests |
 | `driveService.test.js` | Receipt processing unit tests |
 | `attendanceRules.test.js` | Attendance decision rule tests |
 | `attendanceWorkflow.test.js` | Simulated workflow and resilience tests |
 | `notificationState.test.js` | Notification state transition tests |
+| `notificationStore.test.js` | Notification storage and validation tests |
 | `tests.yml` | GitHub Actions workflow |
 
 ## 8. Requirements
 
-- Node.js 20 or later
-- npm
-- Git (optional for local development)
+- Node.js 20 or later.
+- npm.
+- Git (optional for local development).
 
 The GitHub Actions workflow currently uses Node.js 22.
 
@@ -310,7 +353,7 @@ The project uses Node.js's built-in Test Runner and the `node:assert/strict` mod
 
 ### Test Scenarios
 
-The automated test suite currently contains 48 tests.
+The automated test suite currently contains **60 tests**.
 
 **Filename and receipt processing**
 
@@ -356,7 +399,22 @@ The automated test suite currently contains 48 tests.
 - Blocking automatic retries when delivery is uncertain.
 - Rejecting invalid notification states.
 
-Workflow and notification state tests use isolated functions and simulated dependencies. They do not make real API requests.
+**Notification storage**
+
+- Returning `null` when no record exists.
+- Creating notification records.
+- Retrieving previously saved records.
+- Rejecting duplicate records.
+- Preserving notification data.
+- Transitioning from `SENDING` to `SENT`.
+- Transitioning from `SENDING` to `FAILED`.
+- Incrementing attempts after confirmed failures.
+- Preventing direct retries from `UNKNOWN`.
+- Rejecting invalid dates.
+- Rejecting invalid notification statuses.
+- Handling invalid JSON in storage.
+
+Workflow and notification storage tests use isolated functions and simulated dependencies. They do not make real API requests.
 
 ## 10. Continuous Integration
 
@@ -396,7 +454,7 @@ External credentials and identifiers are stored in Google Apps Script Script Pro
 
 The Apps Script source has not yet been added to this repository.
 
-The Node.js workflow and the Apps Script integration are currently separate components. Connecting them through real service adapters remains part of the development roadmap.
+The Node.js workflow and the Apps Script integration are currently separate components. Connecting them through real service adapters and implementing persistent notification storage in Google Apps Script remain part of the development roadmap.
 
 ## 12. Security and Privacy
 
@@ -425,9 +483,9 @@ The current implementation has some known limitations:
 - The Apps Script prototype currently uses the default Google Calendar.
 - Delayed file synchronization may temporarily cause an undercount.
 - The Node.js workflow is not yet connected to real Google service adapters.
-- The notification state machine does not yet have persistent storage.
+- The notification storage abstraction does not yet use a real persistent storage adapter.
 - Notification state transitions are not yet protected by concurrency control.
-- The notification state model is not yet connected to the attendance workflow.
+- The notification state and storage modules are not yet integrated into the attendance workflow.
 - An uncertain Telegram delivery result requires reconciliation before retrying.
 - The daily scheduled trigger has not been activated.
 - Real external service integrations do not yet have automated CI coverage.
@@ -448,7 +506,11 @@ These limitations are being addressed incrementally.
 - [x] Define notification lifecycle states.
 - [x] Validate permitted notification state transitions.
 - [x] Add automated notification state tests.
-- [ ] Implement persistent notification state storage.
+- [x] Implement notification storage abstraction.
+- [x] Implement notification record creation, retrieval, and saving.
+- [x] Validate notification records and state transitions.
+- [x] Add automated notification storage tests.
+- [ ] Connect notification storage to Google Apps Script PropertiesService.
 - [ ] Add concurrency control for notification processing.
 - [ ] Integrate notification state management into the attendance workflow.
 - [ ] Develop adapters for real Google service integration.
