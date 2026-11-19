@@ -1,177 +1,233 @@
+
 # PontoGuard
 
-Automated Attendance Receipt Verification and Notification System
+**Attendance Receipt Verification and Reminder Automation**
 
 PontoGuard is a personal automation and software portfolio project designed to verify attendance punch receipts, identify potentially missing records, and notify the user when manual verification may be necessary.
 
-The project combines a modular JavaScript core, automated tests, GitHub Actions, Google Apps Script, Google Drive, Google Calendar, FolderSync, and Telegram notifications.
+The project combines a modular JavaScript/Node.js core, automated testing, Google Apps Script integrations, Google Drive, Google Calendar, Telegram, and GitHub Actions.
 
 ## 1. Project Objective
 
 The system is designed to:
 
 1. Read attendance receipt filenames stored in Google Drive.
-2. Extract 13-digit Unix timestamps in milliseconds.
-3. Convert timestamps using the `America/Sao_Paulo` timezone.
+2. Extract 13-digit Unix timestamps in milliseconds from filenames.
+3. Convert timestamps into dates and times using the `America/Sao_Paulo` timezone.
 4. Count unique receipts for each workday.
-5. Check Google Calendar for a day-off event titled `Folga`.
+5. Check Google Calendar for scheduled days off.
 6. Send a Telegram reminder when fewer than four unique receipts are found on a working day.
 
 Filenames are the source of timestamp information. The system does not depend on image metadata or image recognition.
 
 PontoGuard is a personal reminder tool. It does not replace an official attendance management system.
 
-## 2. Current Project Status
+## 2. Project Status
 
-**Current stage:** JavaScript core implemented and tested; Google Apps Script integration manually validated and versioned; production scheduling remains disabled.
+**Current stage: Core implementation, Apps Script integration, persistent notification records, locking, and manual concurrency validation.**
 
 ### Implemented in the GitHub repository
 
-- Filename parsing and timestamp conversion.
-- Timezone-aware date and time extraction.
-- Receipt grouping by date.
-- Duplicate timestamp detection.
-- Attendance reminder decision rules.
-- Workflow orchestration using injected dependencies.
-- Notification state machine (`SENDING`, `SENT`, `FAILED`, `UNKNOWN`).
-- Persistent notification store abstraction with injectable storage adapter.
-- Automated unit and workflow tests.
-- GitHub Actions continuous integration.
+- [x] Filename timestamp parser.
+- [x] Unix timestamp conversion and `America/Sao_Paulo` timezone handling.
+- [x] Receipt grouping by date.
+- [x] Duplicate timestamp detection.
+- [x] Invalid filename handling.
+- [x] Attendance reminder decision rules.
+- [x] Workflow orchestration with injected dependencies.
+- [x] Simulated workflow and resilience tests.
+- [x] Notification lifecycle state machine.
+- [x] Notification state transition validation.
+- [x] Abstract persistent notification store with injectable adapter.
+- [x] Automated Node.js test suite.
+- [x] GitHub Actions continuous integration.
+- [x] Sanitized Google Apps Script source code in `apps-script/Code.gs`.
 
-The Node.js test suite has **60 passing tests**, as confirmed during project development.
+### Implemented and manually validated in Google Apps Script
 
-### Implemented and manually tested in Google Apps Script
+- [x] Google Drive folder reading.
+- [x] Receipt counting by date and timestamp deduplication.
+- [x] Google Calendar day-off verification.
+- [x] Telegram Bot API message delivery.
+- [x] Integrated historical verification scenarios.
+- [x] Persistent notification records using `PropertiesService`.
+- [x] Notification states and guarded transitions.
+- [x] Manual reconciliation of uncertain notification results.
+- [x] Execution locking using `LockService`.
+- [x] Concurrent execution test using two independent Apps Script executions.
 
-- Reading receipt filenames from Google Drive.
-- Counting unique receipts by date.
-- Checking day-off events in Google Calendar.
-- Sending a test message through the Telegram Bot API.
-- Persistent notification records using `PropertiesService`.
-- Notification state transitions and manual reconciliation.
-- Execution locking using `LockService`.
+### Current validation evidence
 
-Apps Script tests are manual tests executed in the Google Apps Script editor. They are not part of the Node.js GitHub Actions test suite.
+- The Node.js suite reported **60 passing tests** during the PG-021 integration work and subsequent pull request checks.
+- Apps Script storage and notification transition tests were manually executed and reported as approved.
+- The `LockService` acquisition/release test was approved.
+- The PG-024 concurrency test was manually performed with two independent executions: execution A acquired and held the script lock; execution B failed to acquire it within its configured three-second wait. Temporary test properties were then removed.
+- These manual Apps Script checks are not part of the GitHub Actions test suite.
 
-### Not yet completed or enabled
+### Not yet completed
 
-- Automated end-to-end tests against real Google and Telegram services.
-- A dedicated concurrent-execution stress test.
-- Validation of delayed FolderSync uploads and a suitable late-check strategy.
-- Activation and production validation of the daily trigger.
-- Operational monitoring and alerting.
-- A complete production run under normal working conditions.
+- [ ] End-to-end validation of the complete real-world workflow.
+- [ ] Evaluation and mitigation of delayed FolderSync uploads.
+- [ ] Operational monitoring and alerting improvements.
+- [ ] Controlled setup and validation of the daily production trigger.
+- [ ] Automated CI coverage for real Google and Telegram service integrations.
+- [ ] Load and failure testing beyond the controlled two-execution lock test.
+- [ ] Full integration of the Node.js core workflow with real Google service adapters.
 
-**Important:** The daily trigger remains disabled. Passing isolated storage, state-transition, and lock acquisition/release tests does not by itself establish production readiness.
+**Important:** The daily production trigger remains disabled. Manual validation and a controlled concurrency test do not constitute full production readiness.
 
 ## 3. How It Works
 
-The intended operational flow is:
+The intended operational workflow is:
 
-1. Attendance receipt images are saved on an Android device.
+1. Attendance receipt images are stored on an Android device.
 2. FolderSync synchronizes the files with Google Drive.
 3. Google Apps Script reads filenames from the configured Drive folder.
-4. The timestamp in each filename is extracted and converted to a local date.
-5. Google Calendar is checked for an event titled `Folga`.
-6. If the day is not a day off, unique receipts are counted.
-7. If fewer than four receipts are found, the notification state is checked.
-8. If sending is allowed, a reminder is sent through Telegram and the result is recorded.
+4. The timestamp embedded in each filename is extracted.
+5. Timestamps are converted into dates using `America/Sao_Paulo`.
+6. Google Calendar is checked for a day-off event titled `Folga`.
+7. Unique receipts are counted for the analyzed workday.
+8. If fewer than four receipts are found on a working day, the system can send a Telegram reminder.
+9. Notification state is persisted to prevent unsafe repeated sends and to support manual reconciliation.
 
-The day-off check occurs before receipt processing in the Apps Script flow.
+The Apps Script checks the day-off condition before processing receipts. The production entry point uses a script lock so simultaneous executions do not process the protected operation at the same time.
 
-The Node.js core is maintained separately from the Apps Script integration. Its injected dependencies allow external services to be simulated in automated tests.
+The Node.js core separately implements the parser, receipt summary, decision rules, workflow orchestration, notification state machine, and an adapter-based notification store.
 
 ## 4. Business Rules
 
 | Rule | Description |
 |---|---|
 | Filename pattern | `Comprovante_Ponto_Mobile_TIMESTAMP` |
-| Timestamp | 13-digit Unix timestamp in milliseconds |
+| Timestamp format | 13-digit Unix timestamp in milliseconds |
 | Timezone | `America/Sao_Paulo` |
 | Supported extensions | JPG, JPEG, PNG, WEBP |
 | Duplicate detection | Identical timestamps count only once |
+| Invalid filenames | Ignored during processing |
 | Day-off identification | Default Google Calendar event titled `Folga` |
 | Expected receipts | Four unique receipts per working day |
 | Notification condition | Fewer than four receipts on a working day |
 
-The expected receipt count is a configurable business rule.
+The expected number of receipts is an initial configurable business rule.
 
-## 5. JavaScript Core
+## 5. Core Features
 
-The Node.js core is organized into small modules:
+### Filename Parser
 
-- `filenameParser.js`: validates filenames and extracts timestamps.
-- `driveService.js`: summarizes receipts and detects duplicate timestamps.
-- `attendanceRules.js`: evaluates whether a reminder is necessary.
-- `attendanceWorkflow.js`: coordinates the verification flow through injected dependencies.
-- `notificationState.js`: defines allowed notification state transitions.
-- `notificationStore.js`: provides a persistent-store abstraction through an injected adapter.
+The `parseFilename()` function validates receipt filenames, extracts the timestamp, and converts it into a date and time.
 
-### Notification states
+Expected filename pattern:
 
-| Current state | Allowed next state | Meaning |
+`Comprovante_Ponto_Mobile_TIMESTAMP.jpg`
+
+Supported extensions: JPG, JPEG, PNG, and WEBP.
+
+Example:
+
+`Comprovante_Ponto_Mobile_1770416909454.jpg`
+
+All date and time conversions use the `America/Sao_Paulo` timezone.
+
+### Receipt Summarization
+
+The `summarizeReceipts()` function processes a list of filenames and produces:
+
+- `byDate`: number of unique receipts grouped by date.
+- `totalReceipts`: total number of unique valid receipts.
+- `ignoredFiles`: number of invalid filenames.
+- `duplicateFiles`: number of repeated timestamps.
+
+Duplicate detection uses JavaScript's built-in `Set` data structure.
+
+### Attendance Reminder Rules and Workflow
+
+The attendance rules determine whether a reminder is necessary based on:
+
+- The number of unique attendance receipts.
+- Whether the analyzed day is a day off.
+- The expected minimum number of receipts.
+
+The workflow coordinates attendance verification through injected dependencies. This makes it possible to test normal and failure scenarios with simulated services instead of making real API requests.
+
+### Notification State Machine
+
+The notification lifecycle uses four states:
+
+| State | Description |
+|---|---|
+| `SENDING` | Notification delivery has started |
+| `SENT` | Notification delivery was confirmed |
+| `FAILED` | Delivery failure was confirmed |
+| `UNKNOWN` | Delivery result is uncertain |
+
+The transition rules include:
+
+| Current state | Next state | Allowed |
 |---|---|---|
-| `NEW` | `SENDING` | A notification attempt is starting |
-| `SENDING` | `SENT` | Delivery was confirmed |
-| `SENDING` | `FAILED` | A failure was confirmed |
-| `SENDING` | `UNKNOWN` | The result could not be determined |
-| `FAILED` | `SENDING` | A new attempt is allowed |
-| `UNKNOWN` | `SENT` or `FAILED` | Manual reconciliation is required |
-| `SENT` | None | Terminal state; no automatic resend |
+| New notification | `SENDING` | Yes |
+| `SENDING` | `SENT` | Yes |
+| `SENDING` | `FAILED` | Yes |
+| `SENDING` | `UNKNOWN` | Yes |
+| `FAILED` | `SENDING` | Yes |
+| `UNKNOWN` | `SENT` | Yes, after reconciliation |
+| `UNKNOWN` | `FAILED` | Yes, after reconciliation |
+| `SENT` | `SENDING` | No |
+| `UNKNOWN` | `SENDING` | No |
 
-The notification store uses an injectable adapter. Its Node.js tests use an in-memory implementation. The Google Apps Script integration separately persists records through `PropertiesService`.
+An uncertain delivery must be reconciled before another sending attempt.
 
-## 6. Google Apps Script Integration
+### Notification Store in the Node.js Core
 
-The Apps Script implementation is stored in:
+`src/notificationStore.js` provides an adapter-based notification record store. It validates records and state transitions while allowing the storage mechanism to be injected.
 
-```text
-apps-script/
-└── Code.gs
-```
+The automated tests use an in-memory adapter. This Node.js abstraction is separate from the Google Apps Script persistence implementation.
 
-It integrates the Google services and Telegram:
+### Google Apps Script Persistence and Concurrency
 
-- `DriveApp` reads receipt filenames.
-- `CalendarApp` checks day-off events.
-- `PropertiesService` stores configuration and notification records.
-- `LockService` prevents overlapping executions of the protected entry points.
-- `UrlFetchApp` communicates with the Telegram Bot API.
+The Apps Script integration uses:
 
-### Persistent notification records
+- `PropertiesService` to persist notification records.
+- A per-date notification record to track delivery state and attempts.
+- Guarded state transitions and manual reconciliation for uncertain outcomes.
+- `LockService.getScriptLock()` to protect the daily conference and manual reconciliation entry points.
+- `tryLock()` and `finally` blocks to acquire and reliably release the lock.
 
-The Apps Script implementation stores one notification record per date in Script Properties. Records include the schema version, date, status, attempt count, timestamps, and last error.
+The PG-024 manual concurrency test used two independent Apps Script executions. Execution A acquired and held the script lock. Execution B attempted to acquire the same lock while A held it and was refused within the configured timeout.
 
-The implementation avoids automatic retries when the previous result is `UNKNOWN`. The user must first inspect Telegram and reconcile the record as `SENT` or `FAILED`.
+This validates the tested mutual-exclusion behavior. It does not replace broader load testing or end-to-end production validation.
 
-### Execution locking
+## 6. Technologies
 
-The entry points `conferirPontoDiario()` and `reconciliarNotificacao()` use a script lock. If the lock cannot be acquired within the configured wait period, the operation is not processed.
+| Technology | Purpose |
+|---|---|
+| JavaScript (ES Modules) | Application logic |
+| Node.js | Core runtime |
+| Node.js Test Runner | Automated unit testing |
+| Git | Version control |
+| GitHub | Source code hosting |
+| GitHub Actions | Continuous integration |
+| Google Apps Script | External service automation |
+| Google Drive Services | Receipt file access |
+| Google Calendar Services | Day-off verification |
+| PropertiesService | Apps Script notification persistence |
+| LockService | Apps Script execution locking |
+| Telegram Bot API | User notifications |
+| FolderSync | Android-to-Drive synchronization |
 
-The current lock test verifies acquisition and release. A separate concurrent-execution test remains outstanding.
+The Node.js core does not require external npm dependencies.
 
-### Script Properties and secrets
-
-The following values must be configured in Google Apps Script **Project Settings → Script Properties** and must never be committed to this repository:
-
-- `FOLDER_ID`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-
-Do not place real receipt images, personal attendance records, credentials, or private identifiers in the repository.
-
-### Scheduling status
-
-The daily time-driven trigger has **not** been activated. Production scheduling must remain disabled until synchronization timing, recovery behavior, and end-to-end operation have been reviewed.
-
-## 7. Repository Structure
+## 7. Project Structure
 
 ```text
 pontoguard/
+│
 ├── .github/
 │   └── workflows/
 │       └── tests.yml
+│
 ├── apps-script/
 │   └── Code.gs
+│
 ├── src/
 │   ├── filenameParser.js
 │   ├── driveService.js
@@ -179,6 +235,7 @@ pontoguard/
 │   ├── attendanceWorkflow.js
 │   ├── notificationState.js
 │   └── notificationStore.js
+│
 ├── tests/
 │   ├── filenameParser.test.js
 │   ├── driveService.test.js
@@ -186,100 +243,177 @@ pontoguard/
 │   ├── attendanceWorkflow.test.js
 │   ├── notificationState.test.js
 │   └── notificationStore.test.js
+│
 ├── .gitignore
 ├── LICENSE
 ├── package.json
 └── README.md
 ```
 
-## 8. Technologies
+### Main Modules
 
-| Technology | Purpose |
+| File | Responsibility |
 |---|---|
-| JavaScript (ES Modules) | Core application logic |
-| Node.js | Runtime and automated test execution |
-| Node.js Test Runner | Unit and workflow tests |
-| Git and GitHub | Version control and source hosting |
-| GitHub Actions | Continuous integration |
-| Google Apps Script | External service integration |
-| Google Drive | Receipt file storage |
-| Google Calendar | Day-off verification |
-| Google Apps Script PropertiesService | Configuration and notification persistence |
-| Google Apps Script LockService | Execution locking |
-| Telegram Bot API | User notifications |
-| FolderSync | Android-to-Drive synchronization |
+| `src/filenameParser.js` | Filename validation and timestamp extraction |
+| `src/driveService.js` | Receipt summarization and duplicate detection |
+| `src/attendanceRules.js` | Attendance reminder decision rules and input validation |
+| `src/attendanceWorkflow.js` | Attendance verification orchestration using injected dependencies |
+| `src/notificationState.js` | Notification states and transition validation |
+| `src/notificationStore.js` | Adapter-based notification record storage |
+| `tests/` | Automated Node.js tests |
+| `apps-script/Code.gs` | Google Apps Script integration |
+| `.github/workflows/tests.yml` | GitHub Actions test workflow |
 
-The Node.js core does not require external npm dependencies.
-
-## 9. Requirements and Automated Testing
-
-For the Node.js core:
+## 8. Requirements
 
 - Node.js 20 or later.
 - npm.
+- Git (optional for local development).
 
-Run the test suite with:
+The GitHub Actions workflow currently uses Node.js 22.
+
+No external npm dependencies are required to run the current Node.js test suite.
+
+## 9. Installation and Testing
+
+Clone the repository:
+
+```bash
+git clone https://github.com/gugovisk/pontoguard.git
+```
+
+Navigate to the project directory:
+
+```bash
+cd pontoguard
+```
+
+Run the automated tests:
 
 ```bash
 npm test
 ```
 
-GitHub Actions currently uses Node.js 22 and runs the automated test suite for pushes to `main` and pull requests targeting `main`.
+The project uses Node.js's built-in Test Runner and the `node:assert/strict` module.
 
-The automated tests cover filename parsing, receipt summaries, decision rules, workflow orchestration, notification state transitions, and notification-store behavior.
+### Automated Test Coverage
 
-The Apps Script code runs in Google's Apps Script environment and is validated separately through manual test functions in the editor.
+The Node.js suite reported 60 passing tests during the latest completed validation cycle.
 
-## 10. Security and Privacy
+Coverage includes:
+
+- Valid and invalid filenames.
+- Timestamp extraction and timezone conversion.
+- Receipt grouping and duplicate timestamp detection.
+- Attendance reminder rules and day-off handling.
+- Simulated workflow success and failure scenarios.
+- Notification state transitions.
+- Notification record creation, retrieval, persistence through an injected adapter, and invalid record handling.
+
+The automated Node.js tests use isolated functions and simulated dependencies. They do not make real Google Drive, Google Calendar, or Telegram API requests.
+
+Apps Script manual tests are performed separately in the Google Apps Script editor and are not counted as Node.js automated tests.
+
+## 10. Continuous Integration
+
+PontoGuard uses GitHub Actions to execute automated tests.
+
+The workflow is defined in:
+
+`.github/workflows/tests.yml`
+
+It runs when changes are pushed to the `main` branch or when a pull request targets `main`.
+
+The workflow checks out the repository, sets up Node.js 22, and executes `npm test`.
+
+## 11. Google Apps Script Configuration
+
+The sanitized Apps Script source is versioned at:
+
+`apps-script/Code.gs`
+
+The deployed Apps Script project uses Script Properties for sensitive configuration. The actual values must remain outside the public repository.
+
+Expected property names include:
+
+- `FOLDER_ID`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+Do not commit real values, tokens, chat identifiers, private folder IDs, or personal attendance data.
+
+The source code reads configuration from Script Properties. The daily production trigger has not been activated.
+
+## 12. Security and Privacy
 
 The public repository must never contain:
 
+- Real attendance receipt images.
 - Telegram bot tokens.
 - Telegram chat IDs.
 - Private Google Drive folder identifiers.
 - Google account credentials.
-- Real attendance receipt images.
 - Personal attendance records.
 - Other sensitive personal information.
 
-Apps Script credentials and private identifiers must remain in Script Properties. Only sanitized source code and non-sensitive test fixtures belong in GitHub.
+External service credentials must be stored outside source code, using secure configuration mechanisms such as Google Apps Script Script Properties.
 
-## 11. Current Limitations and Risks
+Only sanitized source code, examples, and test fixtures should be committed.
 
-- The parser depends on the expected filename convention.
+## 13. Current Limitations
+
+Known limitations include:
+
+- The core parser depends on the expected filename convention.
 - The Node.js core does not inspect image contents.
-- The Apps Script integration uses the default Google Calendar.
+- The Apps Script integration currently uses the default Google Calendar.
 - Delayed FolderSync uploads may temporarily cause an undercount.
-- Node.js adapters are not yet connected to the real Google services.
-- Apps Script manual tests are not executed by GitHub Actions.
-- The lock acquisition test does not replace a concurrent-execution stress test.
-- A production trigger has not been enabled.
-- Real external service integrations do not yet have automated end-to-end CI coverage.
+- The Node.js workflow is not yet connected to real Google service adapters.
+- The Node.js notification store uses an injected adapter; its tests use an in-memory implementation.
+- The Apps Script integration has separate persistence and locking logic.
+- The manual concurrency test validates a controlled two-execution scenario, not high-load behavior.
+- Uncertain Telegram delivery results require reconciliation before retrying.
+- The daily scheduled trigger has not been activated.
+- Real external service integrations do not yet have automated CI coverage.
+- Full end-to-end production behavior has not yet been validated.
 
-These limitations are tracked as part of the development roadmap.
+## 14. Development Roadmap
 
-## 12. Development Roadmap
+### Completed
 
-- [x] Implement filename parsing and timezone conversion.
-- [x] Implement receipt grouping and duplicate detection.
-- [x] Implement attendance reminder rules and workflow orchestration.
-- [x] Add automated tests and GitHub Actions.
-- [x] Implement notification state machine in the Node.js core.
-- [x] Implement the persistent notification-store abstraction in the Node.js core.
-- [x] Integrate notification persistence with Apps Script `PropertiesService`.
-- [x] Add Apps Script notification state transitions and manual reconciliation.
-- [x] Add `LockService` to the protected Apps Script entry points.
-- [x] Add the sanitized Apps Script source to the repository.
-- [ ] Add a concurrent-execution stress test.
-- [ ] Evaluate FolderSync delays and define a late-check strategy.
-- [ ] Expand real-service and end-to-end validation.
-- [ ] Review operational monitoring and error recovery.
-- [ ] Configure and validate the daily trigger only after the preceding checks.
+- [x] Develop the filename parser.
+- [x] Implement receipt grouping by date.
+- [x] Implement duplicate timestamp detection.
+- [x] Create automated unit tests.
+- [x] Configure GitHub Actions.
+- [x] Implement attendance reminder decision rules.
+- [x] Implement workflow orchestration with injected dependencies.
+- [x] Add simulated workflow and resilience tests.
+- [x] Define notification lifecycle states.
+- [x] Validate permitted notification state transitions.
+- [x] Add automated notification state tests.
+- [x] Implement the adapter-based Node.js notification store (PG-021).
+- [x] Implement Apps Script notification persistence with PropertiesService (PG-022).
+- [x] Add LockService protection to Apps Script entry points (PG-023).
+- [x] Version the sanitized Apps Script integration in the repository.
+- [x] Perform a controlled two-execution concurrency test (PG-024).
 
-## 13. License
+### Pending
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+- [ ] Perform broader concurrency and failure testing.
+- [ ] Complete end-to-end validation with real services.
+- [ ] Evaluate FolderSync synchronization delays and define a safe verification window.
+- [ ] Improve operational monitoring and error handling.
+- [ ] Configure and validate the daily production trigger only after the preceding checks.
+- [ ] Expand automated testing for external service integrations.
+- [ ] Evaluate future integration of the Node.js workflow with real Google service adapters.
+
+## 15. License
+
+This project is licensed under the MIT License.
+
+See the `LICENSE` file for details.
 
 ---
 
-PontoGuard is an ongoing portfolio project focused on practical software development, problem-solving, code quality, automated testing, and personal workflow automation.
+**PontoGuard** is an ongoing portfolio project focused on practical software development, problem-solving, code quality, automated testing, and reliable automation.
