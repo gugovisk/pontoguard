@@ -69,7 +69,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ### Not yet completed
 
-- [ ] Review the detailed log of the first automatic execution to document the exact Calendar result, Drive receipt count, and Telegram notification decision.
+- [x] Review the first automatic execution log: the run processed 2026-11-23, identified it as a day off, skipped the reminder workflow, and released the execution lock. Because the day-off rule short-circuited the workflow, no Drive receipt count or Telegram decision was expected for this run.
 - [ ] Evaluate FolderSync delays over multiple workdays; the 2026-11-22 check is a single spot-check, not a timing/reliability study.
 - [ ] Operational monitoring and alerting improvements.
 - [ ] Automated CI coverage for real Google and Telegram service integrations.
