@@ -24,7 +24,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core implementation, Apps Script integration, persistent notification records, locking, and manual concurrency validation.**
+**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed and awaiting first automatic execution.**
 
 ### Implemented in the GitHub repository
 
@@ -55,6 +55,9 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 - [x] Manual reconciliation of uncertain notification results.
 - [x] Execution locking using `LockService`.
 - [x] Concurrent execution test using two independent Apps Script executions.
+- [x] PG-025 manual Apps Script test suites: 27/27 passed (state transitions, receipt counting, day-off rules, and integrated simulated workflows).
+- [x] Drive folder spot-check on 2026-11-23: 119 unique valid receipts across 42 dates; zero ignored files and zero duplicate timestamps.
+- [x] FolderSync-to-Drive spot-check: the three receipt files present for 2026-11-22 on the phone were also present in the configured Drive folder.
 
 ### Current validation evidence
 
@@ -66,10 +69,9 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ### Not yet completed
 
-- [ ] End-to-end validation of the complete real-world workflow.
-- [ ] Evaluation and mitigation of delayed FolderSync uploads.
+- [ ] Confirm the first scheduled production execution and its outcome (Drive, Calendar, receipt count, and Telegram notification decision).
+- [ ] Evaluate FolderSync delays over multiple workdays; the 2026-11-22 check is a single spot-check, not a timing/reliability study.
 - [ ] Operational monitoring and alerting improvements.
-- [ ] Controlled setup and validation of the daily production trigger.
 - [ ] Automated CI coverage for real Google and Telegram service integrations.
 - [ ] Load and failure testing beyond the controlled two-execution lock test.
 - [ ] Full integration of the Node.js core workflow with real Google service adapters.
@@ -89,6 +91,7 @@ The intended operational workflow is:
 7. Unique receipts are counted for the analyzed workday.
 8. If fewer than four receipts are found on a working day, the system can send a Telegram reminder.
 9. Notification state is persisted to prevent unsafe repeated sends and to support manual reconciliation.
+10. A daily time-driven Apps Script trigger invokes the protected entry point near 23:45 in `America/Sao_Paulo`; the entry point only processes during 23:00–00:59 and resolves midnight runs to the previous calendar date.
 
 The Apps Script checks the day-off condition before processing receipts. The production entry point uses a script lock so simultaneous executions do not process the protected operation at the same time.
 
@@ -226,7 +229,8 @@ pontoguard/
 │       └── tests.yml
 │
 ├── apps-script/
-│   └── Code.gs
+│   ├── Code.gs
+│   └── PG025_Tests.gs
 │
 ├── src/
 │   ├── filenameParser.js
@@ -328,9 +332,10 @@ The workflow checks out the repository, sets up Node.js 22, and executes `npm te
 
 ## 11. Google Apps Script Configuration
 
-The sanitized Apps Script source is versioned at:
+The sanitized production source and PG-025 manual test suite are versioned at:
 
-`apps-script/Code.gs`
+- `apps-script/Code.gs`
+- `apps-script/PG025_Tests.gs`
 
 The deployed Apps Script project uses Script Properties for sensitive configuration. The actual values must remain outside the public repository.
 
@@ -342,7 +347,7 @@ Expected property names include:
 
 Do not commit real values, tokens, chat identifiers, private folder IDs, or personal attendance data.
 
-The source code reads configuration from Script Properties. The daily production trigger has not been activated.
+The source code reads configuration from Script Properties. A daily time-driven trigger for `conferirPontoDiario` was installed on 2026-11-23, targeting approximately 23:45 in `America/Sao_Paulo`. The installation log confirmed that the trigger was created and that zero previous triggers for this handler were removed. The first scheduled production execution has not yet been confirmed.
 
 ## 12. Security and Privacy
 
@@ -373,7 +378,7 @@ Known limitations include:
 - The Apps Script integration has separate persistence and locking logic.
 - The manual concurrency test validates a controlled two-execution scenario, not high-load behavior.
 - Uncertain Telegram delivery results require reconciliation before retrying.
-- The daily scheduled trigger has not been activated.
+- The daily scheduled trigger is installed, but its first automatic production execution has not yet been confirmed.
 - Real external service integrations do not yet have automated CI coverage.
 - Full end-to-end production behavior has not yet been validated.
 
@@ -397,6 +402,9 @@ Known limitations include:
 - [x] Add LockService protection to Apps Script entry points (PG-023).
 - [x] Version the sanitized Apps Script integration in the repository.
 - [x] Perform a controlled two-execution concurrency test (PG-024).
+- [x] Add PG-025 Apps Script manual test suite and record 27 passing scenarios.
+- [x] Verify a real Drive folder listing and a FolderSync synchronization spot-check.
+- [x] Install the daily time-driven trigger (target 23:45, `America/Sao_Paulo`).
 
 ### Pending
 
@@ -407,6 +415,7 @@ Known limitations include:
 - [ ] Configure and validate the daily production trigger only after the preceding checks.
 - [ ] Expand automated testing for external service integrations.
 - [ ] Evaluate future integration of the Node.js workflow with real Google service adapters.
+- [ ] Confirm and document the first automatic execution of the production trigger.
 
 ## 15. License
 
