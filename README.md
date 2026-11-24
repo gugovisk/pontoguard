@@ -24,7 +24,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed and awaiting first automatic execution.**
+**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed and first automatic execution confirmed on 2026-11-24. Detailed workflow outcome and repeatability remain under observation.**
 
 ### Implemented in the GitHub repository
 
@@ -69,14 +69,14 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ### Not yet completed
 
-- [ ] Confirm the first scheduled production execution and its outcome (Drive, Calendar, receipt count, and Telegram notification decision).
+- [ ] Review the detailed log of the first automatic execution to document the exact Calendar result, Drive receipt count, and Telegram notification decision.
 - [ ] Evaluate FolderSync delays over multiple workdays; the 2026-11-22 check is a single spot-check, not a timing/reliability study.
 - [ ] Operational monitoring and alerting improvements.
 - [ ] Automated CI coverage for real Google and Telegram service integrations.
 - [ ] Load and failure testing beyond the controlled two-execution lock test.
 - [ ] Full integration of the Node.js core workflow with real Google service adapters.
 
-**Important:** The daily production trigger remains disabled. Manual validation and a controlled concurrency test do not constitute full production readiness.
+**Important:** The daily time-driven trigger is installed and has completed one automatic execution. This confirms that the trigger fired, but one run does not establish repeated reliability or complete end-to-end production readiness.
 
 ## 3. How It Works
 
@@ -91,7 +91,7 @@ The intended operational workflow is:
 7. Unique receipts are counted for the analyzed workday.
 8. If fewer than four receipts are found on a working day, the system can send a Telegram reminder.
 9. Notification state is persisted to prevent unsafe repeated sends and to support manual reconciliation.
-10. A daily time-driven Apps Script trigger invokes the protected entry point near 23:45 in `America/Sao_Paulo`; the entry point only processes during 23:00–00:59 and resolves midnight runs to the previous calendar date.
+10. A daily time-driven Apps Script trigger invokes the protected entry point. The Apps Script trigger screen displayed the execution window as 00:00–01:00 (`GMT-03:00`). The first automatic execution occurred on 2026-11-24 at 00:19:47 and processed 2026-11-23; the entry point resolves midnight runs to the previous calendar date.
 
 The Apps Script checks the day-off condition before processing receipts. The production entry point uses a script lock so simultaneous executions do not process the protected operation at the same time.
 
@@ -347,7 +347,7 @@ Expected property names include:
 
 Do not commit real values, tokens, chat identifiers, private folder IDs, or personal attendance data.
 
-The source code reads configuration from Script Properties. A daily time-driven trigger for `conferirPontoDiario` was installed on 2026-11-23, targeting approximately 23:45 in `America/Sao_Paulo`. The installation log confirmed that the trigger was created and that zero previous triggers for this handler were removed. The first scheduled production execution has not yet been confirmed.
+The source code reads configuration from Script Properties. A daily time-driven trigger for `conferirPontoDiario` was installed on 2026-11-23. The installation log confirmed trigger creation and that zero previous triggers for this handler were removed. The Apps Script trigger screen displayed its execution window as 00:00–01:00 (`GMT-03:00`). The first automatic execution was confirmed on 2026-11-24 at 00:19:47, with the routine processing 2026-11-23. The exact business outcome of that run still needs to be recorded from its execution log.
 
 ## 12. Security and Privacy
 
@@ -378,7 +378,7 @@ Known limitations include:
 - The Apps Script integration has separate persistence and locking logic.
 - The manual concurrency test validates a controlled two-execution scenario, not high-load behavior.
 - Uncertain Telegram delivery results require reconciliation before retrying.
-- The daily scheduled trigger is installed, but its first automatic production execution has not yet been confirmed.
+- Only one automatic trigger execution has been confirmed so far; repeated execution reliability and full workflow outcomes still require monitoring.
 - Real external service integrations do not yet have automated CI coverage.
 - Full end-to-end production behavior has not yet been validated.
 
@@ -404,7 +404,8 @@ Known limitations include:
 - [x] Perform a controlled two-execution concurrency test (PG-024).
 - [x] Add PG-025 Apps Script manual test suite and record 27 passing scenarios.
 - [x] Verify a real Drive folder listing and a FolderSync synchronization spot-check.
-- [x] Install the daily time-driven trigger (target 23:45, `America/Sao_Paulo`).
+- [x] Install the daily time-driven trigger for `conferirPontoDiario`.
+- [x] Confirm its first automatic execution on 2026-11-24 at 00:19:47, processing the previous date (2026-11-23).
 
 ### Pending
 
@@ -412,10 +413,11 @@ Known limitations include:
 - [ ] Complete end-to-end validation with real services.
 - [ ] Evaluate FolderSync synchronization delays and define a safe verification window.
 - [ ] Improve operational monitoring and error handling.
-- [ ] Configure and validate the daily production trigger only after the preceding checks.
+- [ ] Review and record the detailed outcome of the first automatic execution (Calendar, Drive, receipt count, and Telegram decision).
+- [ ] Monitor the trigger and FolderSync behavior across multiple workdays.
 - [ ] Expand automated testing for external service integrations.
 - [ ] Evaluate future integration of the Node.js workflow with real Google service adapters.
-- [ ] Confirm and document the first automatic execution of the production trigger.
+
 
 ## 15. License
 
