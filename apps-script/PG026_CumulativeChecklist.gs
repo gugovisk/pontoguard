@@ -5,42 +5,19 @@
  * Este arquivo depende das funções utilitárias de Code.gs.
  * O acionador diário passa a chamar executarConferenciaCumulativa_().
  *
- * Horário padrão (Brasília / America/Sao_Paulo):
+ * Horários de referência (Brasília / America/Sao_Paulo):
  * 1º ponto: 13:00
- * 2º ponto: 18:30
- * 3º ponto: 19:42 (72 minutos após o 2º)
+ * 2º ponto: 15:48
+ * 3º ponto: 17:00
  * 4º ponto: 23:00
  *
- * As configurações podem ser alteradas em Script Properties:
- * PUNCH_START_TIME, PUNCH_BREAK_START_TIME,
- * PUNCH_BREAK_DURATION_MINUTES, PUNCH_END_TIME,
- * PUNCH_TOLERANCE_MINUTES.
+ * Timestamps dos nomes dos comprovantes são a fonte de verdade
+ * para os horários efetivamente registrados. O horário de referência
+ * só é exibido para um ponto sem comprovante.
  */
 
 function pg026_configuracao_() {
-  var props = PropertiesService.getScriptProperties();
-
-  var config = {
-    start: props.getProperty("PUNCH_START_TIME") || "13:00",
-    breakStart: props.getProperty("PUNCH_BREAK_START_TIME") || "18:30",
-    breakDuration: Number(props.getProperty("PUNCH_BREAK_DURATION_MINUTES") || 72),
-    end: props.getProperty("PUNCH_END_TIME") || "23:00",
-    tolerance: Number(props.getProperty("PUNCH_TOLERANCE_MINUTES") || 30)
-  };
-
-  pg026_minutosHorario_(config.start);
-  pg026_minutosHorario_(config.breakStart);
-  pg026_minutosHorario_(config.end);
-
-  if (!Number.isInteger(config.breakDuration) || config.breakDuration < 1 || config.breakDuration > 360) {
-    throw new Error("PUNCH_BREAK_DURATION_MINUTES deve ser um inteiro entre 1 e 360.");
-  }
-
-  if (!Number.isInteger(config.tolerance) || config.tolerance < 1 || config.tolerance > 60) {
-    throw new Error("PUNCH_TOLERANCE_MINUTES deve ser um inteiro entre 1 e 60.");
-  }
-
-  return config;
+  return { expectedTimes: ["13:00", "15:48", "17:00", "23:00"] };
 }
 
 function pg026_minutosHorario_(horario) {
@@ -60,13 +37,12 @@ function pg026_formatarMinutos_(minutos) {
 }
 
 function pg026_horariosEsperados_(config) {
-  var inicioIntervalo = pg026_minutosHorario_(config.breakStart);
-  return [
-    { index: 1, label: "Entrada", expectedTime: config.start },
-    { index: 2, label: "Saída para intervalo", expectedTime: config.breakStart },
-    { index: 3, label: "Retorno do intervalo", expectedTime: pg026_formatarMinutos_(inicioIntervalo + config.breakDuration) },
-    { index: 4, label: "Saída", expectedTime: config.end }
-  ];
+  var horarios = config.expectedTimes || ["13:00", "15:48", "17:00", "23:00"];
+  var rotulos = ["Entrada", "Ponto 2", "Ponto 3", "Saída"];
+  return horarios.map(function(horario, indice) {
+    pg026_minutosHorario_(horario);
+    return { index: indice + 1, label: rotulos[indice], expectedTime: horario };
+  });
 }
 
 function pg026_chaveDia_(data) {
@@ -214,133 +190,56 @@ function pg026_obterComprovantesPorData_() {
 
 function pg026_mapearComprovantes_(timestamps, config) {
   var horarios = pg026_horariosEsperados_(config);
-  var marcados = [false, false, false, false];
-  var horasPorPonto = [null, null, null, null];
-  var candidatos = [];
-  var naoAssociados = [];
-
-  var registros = (timestamps || []).slice().sort(function(a, b) { return a - b; }).map(function(timestamp) {
-    var hora = Utilities.formatDate(new Date(timestamp), TIME_ZONE, "HH:mm");
-    return {
-      timestamp: timestamp,
-      hora: hora,
-      minutos: pg026_minutosHorario_(hora)
-    };
+  var registros = (timestamps || []).slice().sort(function(a,b){return a-b;}).map(function(timestamp){
+    var hora=Utilities.formatDate(new Date(timestamp),TIME_ZONE,"HH:mm");
+    return {timestamp:timestamp,hora:hora,minutos:pg026_minutosHorario_(hora)};
   });
+  var total=Math.min(registros.length,horarios.length);
+  var melhorCusto=Infinity, melhorAssociacao=null;
 
-  // Quatro ou mais timestamps únicos continuam satisfazendo a regra original.
-  if (registros.length >= 4) {
-    registros.slice(0, 4).forEach(function(item, indice) {
-      marcados[indice] = true;
-      horasPorPonto[indice] = item.hora;
-    });
-
-    return {
-      confirmed: marcados,
-      timesByIndex: horasPorPonto,
-      unmatched: registros.slice(4).map(function(item) { return item.hora; })
-    };
-  }
-
-  registros.forEach(function(item, receiptIndex) {
-    horarios.forEach(function(ponto, slotIndex) {
-      var distancia = Math.abs(
-        item.minutos - pg026_minutosHorario_(ponto.expectedTime)
-      );
-
-      if (distancia <= config.tolerance) {
-        candidatos.push({
-          receiptIndex: receiptIndex,
-          slotIndex: slotIndex,
-          distance: distancia
-        });
-      }
-    });
-  });
-
-  // Prioriza a correspondência mais próxima e não reutiliza comprovantes/pontos.
-  candidatos.sort(function(a, b) { return a.distance - b.distance; });
-  var reciboUsado = {};
-
-  candidatos.forEach(function(candidato) {
-    if (reciboUsado[candidato.receiptIndex] || marcados[candidato.slotIndex]) return;
-
-    reciboUsado[candidato.receiptIndex] = true;
-    marcados[candidato.slotIndex] = true;
-    horasPorPonto[candidato.slotIndex] = registros[candidato.receiptIndex].hora;
-  });
-
-  registros.forEach(function(item, indice) {
-    if (!reciboUsado[indice]) naoAssociados.push(item.hora);
-  });
-
-  return {
-    confirmed: marcados,
-    timesByIndex: horasPorPonto,
-    unmatched: naoAssociados
-  };
-}
-
-function pg026_somarHorario_(horario, minutos) {
-  return pg026_formatarMinutos_(pg026_minutosHorario_(horario) + minutos);
-}
-
-function pg026_subtrairHorario_(horario, minutos) {
-  return pg026_formatarMinutos_(pg026_minutosHorario_(horario) - minutos);
-}
-
-function pg026_atualizarRegistroComDrive_(registro, resumo, config) {
-  var timestamps = resumo ? resumo.timestamps : [];
-  var mapeamento = pg026_mapearComprovantes_(timestamps, config);
-
-  registro.punches.forEach(function(ponto, indice) {
-    if (mapeamento.confirmed[indice]) {
-      ponto.driveConfirmed = true;
-      ponto.driveTime = mapeamento.timesByIndex[indice];
+  // Associa em ordem cronológica e minimiza a distância aos horários de referência.
+  // Não descarta horários reais por tolerância: o timestamp do nome é a fonte de verdade.
+  function buscar(ri,si,pares,custo){
+    if(pares.length===total){
+      if(custo<melhorCusto){melhorCusto=custo;melhorAssociacao=pares.slice();}
+      return;
     }
-  });
-
-  // Se somente um dos pontos do intervalo foi registrado, calcula o horário
-  // esperado do outro a partir da duração configurada (72 minutos por padrão).
-  var segundo = registro.punches[1];
-  var terceiro = registro.punches[2];
-
-  if (segundo.driveTime && !terceiro.driveTime) {
-    terceiro.expectedTime = pg026_somarHorario_(segundo.driveTime, config.breakDuration);
-  } else if (terceiro.driveTime && !segundo.driveTime) {
-    segundo.expectedTime = pg026_subtrairHorario_(terceiro.driveTime, config.breakDuration);
-  } else if (!segundo.driveTime && !terceiro.driveTime) {
-    segundo.expectedTime = config.breakStart;
-    terceiro.expectedTime = pg026_somarHorario_(config.breakStart, config.breakDuration);
+    if(ri>=registros.length||si>=horarios.length)return;
+    if(registros.length-ri>total-pares.length)buscar(ri+1,si,pares,custo);
+    if(horarios.length-si>total-pares.length)buscar(ri,si+1,pares,custo);
+    var distancia=Math.abs(registros[ri].minutos-pg026_minutosHorario_(horarios[si].expectedTime));
+    pares.push({receiptIndex:ri,slotIndex:si});
+    buscar(ri+1,si+1,pares,custo+distancia);
+    pares.pop();
   }
+  buscar(0,0,[],0);
 
-  if (segundo.driveTime && terceiro.driveTime) {
-    var diferenca = pg026_minutosHorario_(terceiro.driveTime) -
-      pg026_minutosHorario_(segundo.driveTime);
-    registro.intervalGapMinutes = diferenca;
-
-    // Horários de ponto são no mesmo dia; mantém o cálculo direto.
-    registro.intervalGapWarning = diferenca !== config.breakDuration;
-  } else {
-    registro.intervalGapMinutes = null;
-    registro.intervalGapWarning = false;
-  }
-
-  registro.receiptTimes = timestamps.map(function(timestamp) {
-    return Utilities.formatDate(new Date(timestamp), TIME_ZONE, "HH:mm");
+  var marcados=[false,false,false,false], horas=[null,null,null,null], usados={};
+  (melhorAssociacao||[]).forEach(function(par){
+    marcados[par.slotIndex]=true;
+    horas[par.slotIndex]=registros[par.receiptIndex].hora;
+    usados[par.receiptIndex]=true;
   });
+  var naoAssociados=registros.filter(function(item,i){return !usados[i];}).map(function(item){return item.hora;});
+  return {confirmed:marcados,timesByIndex:horas,unmatched:naoAssociados};
+}
 
-  registro.unmatchedReceiptTimes = mapeamento.unmatched;
-  registro.complete = registro.punches.every(function(ponto) {
-    return ponto.driveConfirmed || ponto.manualConfirmed;
+function pg026_atualizarRegistroComDrive_(registro,resumo,config){
+  var timestamps=resumo?resumo.timestamps:[];
+  var mapa=pg026_mapearComprovantes_(timestamps,config);
+  registro.punches.forEach(function(ponto,indice){
+    ponto.driveConfirmed=Boolean(mapa.confirmed[indice]);
+    ponto.driveTime=mapa.timesByIndex[indice];
   });
-
-  if (registro.complete && !registro.completedAt) {
-    registro.completedAt = new Date().toISOString();
-  }
-
-  if (!registro.complete) registro.completedAt = null;
-
+  registro.receiptTimes=timestamps.map(function(timestamp){
+    return Utilities.formatDate(new Date(timestamp),TIME_ZONE,"HH:mm");
+  });
+  registro.unmatchedReceiptTimes=mapa.unmatched;
+  registro.complete=registro.punches.every(function(ponto){
+    return ponto.driveConfirmed||ponto.manualConfirmed;
+  });
+  if(registro.complete&&!registro.completedAt)registro.completedAt=new Date().toISOString();
+  if(!registro.complete)registro.completedAt=null;
   return registro;
 }
 
@@ -468,15 +367,6 @@ function pg026_montarChecklist_(pendencias) {
         }]);
       }
     });
-
-    if (registro.intervalGapWarning) {
-      linhas.push(
-        "⚠️ Intervalo registrado entre P2 e P3: " +
-        Math.floor(registro.intervalGapMinutes / 60) + "h" +
-        (registro.intervalGapMinutes % 60) + "min; esperado: " +
-        pg026_configuracao_().breakDuration + "min."
-      );
-    }
 
     if (registro.unmatchedReceiptTimes && registro.unmatchedReceiptTimes.length) {
       linhas.push(
