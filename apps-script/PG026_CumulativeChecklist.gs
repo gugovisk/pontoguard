@@ -350,7 +350,28 @@ function pg026_obterOuDefinirInicio_(dataAlvo) {
   var inicio = props.getProperty(chave);
 
   if (!inicio) {
-    inicio = dataAlvo;
+    // Recupera datas para as quais a versão anterior já havia enviado alertas.
+    // Assim, o primeiro checklist não abandona pendências anteriores à PG-026.
+    var todas = props.getProperties();
+    var datasHistoricas = [];
+
+    Object.keys(todas).forEach(function(nome) {
+      var match = nome.match(/^PONTOGUARD_NOTIFICATION_(\\d{4}-\\d{2}-\\d{2})$/);
+      if (match && match[1] <= dataAlvo) datasHistoricas.push(match[1]);
+    });
+
+    var ultimaDataAntiga = props.getProperty("ULTIMA_DATA_NOTIFICADA");
+    if (ultimaDataAntiga) {
+      try {
+        validarData_(ultimaDataAntiga);
+        if (ultimaDataAntiga <= dataAlvo) datasHistoricas.push(ultimaDataAntiga);
+      } catch (erro) {
+        console.warn("ULTIMA_DATA_NOTIFICADA antiga ignorada: " + erro.message);
+      }
+    }
+
+    datasHistoricas.sort();
+    inicio = datasHistoricas.length ? datasHistoricas[0] : dataAlvo;
     props.setProperty(chave, inicio);
     console.log("PG-026 — início do controle cumulativo: " + inicio);
   }
