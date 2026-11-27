@@ -24,7 +24,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed and first automatic execution confirmed on 2026-11-24. Detailed workflow outcome and repeatability remain under observation.**
+**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed; three automatic executions on working days confirmed receipt counting and successful Telegram delivery, alongside two day-off skips. Broader reliability and synchronization timing remain under observation.**
 
 ### Implemented in the GitHub repository
 
@@ -66,6 +66,8 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 - The `LockService` acquisition/release test was approved.
 - The PG-024 concurrency test was manually performed with two independent executions: execution A acquired and held the script lock; execution B failed to acquire it within its configured three-second wait. Temporary test properties were then removed.
 - These manual Apps Script checks are not part of the GitHub Actions test suite.
+- Automatic operational runs shown in the Apps Script execution log: 2026-11-24 processed 2026-11-23 and correctly skipped a day off; 2026-11-25 processed 2026-11-24 and skipped a day off; 2026-11-26 processed 2026-11-25 and found 3 unique receipts (0 duplicates, 0 ignored files), then logged successful Telegram delivery (`SENT`, 1 attempt); 2026-11-27 processed 2026-11-26 and again found 3 unique receipts (0 duplicates, 0 ignored files), then logged successful Telegram delivery (`SENT`, 1 attempt). The day-off runs correctly stopped before Drive counting.
+- The screenshot evidence confirms two consecutive successful reminder deliveries on working days; the repeated run sequence now provides more than one automatic trigger execution, but does not establish long-term reliability.
 
 ### Not yet completed
 
@@ -76,7 +78,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 - [ ] Load and failure testing beyond the controlled two-execution lock test.
 - [ ] Full integration of the Node.js core workflow with real Google service adapters.
 
-**Important:** The daily time-driven trigger is installed and has completed one automatic execution. This confirms that the trigger fired, but one run does not establish repeated reliability or complete end-to-end production readiness.
+**Important:** The daily time-driven trigger is installed and has completed multiple automatic executions. Two consecutive working-day runs confirmed Drive counting and Telegram delivery, while day-off runs skipped reminders. This is meaningful operational evidence, but does not establish long-term reliability, FolderSync timing guarantees, or complete production readiness.
 
 ## 3. How It Works
 
@@ -91,7 +93,7 @@ The intended operational workflow is:
 7. Unique receipts are counted for the analyzed workday.
 8. If fewer than four receipts are found on a working day, the system can send a Telegram reminder.
 9. Notification state is persisted to prevent unsafe repeated sends and to support manual reconciliation.
-10. A daily time-driven Apps Script trigger invokes the protected entry point. The Apps Script trigger screen displayed the execution window as 00:00–01:00 (`GMT-03:00`). The first automatic execution occurred on 2026-11-24 at 00:19:47 and processed 2026-11-23; the entry point resolves midnight runs to the previous calendar date.
+10. A daily time-driven Apps Script trigger invokes the protected entry point. The Apps Script trigger screen displayed the execution window as 00:00–01:00 (`GMT-03:00`). The first automatic execution occurred on 2026-11-24 at 00:19:47 and processed 2026-11-23; subsequent executions on 2026-11-25, 2026-11-26, and 2026-11-27 processed the previous calendar dates. The 2026-11-25 run (processing 2026-11-24) and 2026-11-24 run (processing 2026-11-23) identified days off and skipped reminders. The 2026-11-26 run (processing 2026-11-25) and 2026-11-27 run (processing 2026-11-26) each counted three unique receipts and logged successful Telegram delivery with state `SENT` and one attempt. The entry point resolves midnight runs to the previous calendar date.
 
 The Apps Script checks the day-off condition before processing receipts. The production entry point uses a script lock so simultaneous executions do not process the protected operation at the same time.
 
@@ -378,7 +380,7 @@ Known limitations include:
 - The Apps Script integration has separate persistence and locking logic.
 - The manual concurrency test validates a controlled two-execution scenario, not high-load behavior.
 - Uncertain Telegram delivery results require reconciliation before retrying.
-- Only one automatic trigger execution has been confirmed so far; repeated execution reliability and full workflow outcomes still require monitoring.
+- Multiple automatic trigger executions have been confirmed, including two consecutive working-day runs with successful Telegram delivery; longer-term reliability and FolderSync timing still require monitoring.
 - Real external service integrations do not yet have automated CI coverage.
 - Full end-to-end production behavior has not yet been validated.
 
@@ -405,7 +407,9 @@ Known limitations include:
 - [x] Add PG-025 Apps Script manual test suite and record 27 passing scenarios.
 - [x] Verify a real Drive folder listing and a FolderSync synchronization spot-check.
 - [x] Install the daily time-driven trigger for `conferirPontoDiario`.
-- [x] Confirm its first automatic execution on 2026-11-24 at 00:19:47, processing the previous date (2026-11-23).
+- [x] Confirm the first automatic execution on 2026-11-24 at 00:19:47, processing the previous date (2026-11-23).
+- [x] Confirm subsequent automatic executions on 2026-11-25 and 2026-11-26 correctly skipped day-off reminders.
+- [x] Confirm automatic working-day executions on 2026-11-26 and 2026-11-27 each counted three unique receipts and logged successful Telegram delivery (`SENT`, one attempt).
 
 ### Pending
 
@@ -413,7 +417,6 @@ Known limitations include:
 - [ ] Complete end-to-end validation with real services.
 - [ ] Evaluate FolderSync synchronization delays and define a safe verification window.
 - [ ] Improve operational monitoring and error handling.
-- [ ] Review and record the detailed outcome of the first automatic execution (Calendar, Drive, receipt count, and Telegram decision).
 - [ ] Monitor the trigger and FolderSync behavior across multiple workdays.
 - [ ] Expand automated testing for external service integrations.
 - [ ] Evaluate future integration of the Node.js workflow with real Google service adapters.
