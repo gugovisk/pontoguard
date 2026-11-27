@@ -17,7 +17,7 @@
  */
 
 function pg026_configuracao_() {
-  return { expectedTimes: ["13:00", "15:48", "17:00", "23:00"] };
+  return { expectedTimes: ["13:00", "15:48", "17:00", "23:00"], breakDurationMinutes: 72 };
 }
 
 function pg026_minutosHorario_(horario) {
@@ -229,11 +229,36 @@ function pg026_atualizarRegistroComDrive_(registro,resumo,config){
   var mapa=pg026_mapearComprovantes_(timestamps,config);
   var referencias = pg026_horariosEsperados_(config);
   registro.punches.forEach(function(ponto,indice){
-    // Atualiza também registros persistidos antes da correção dos horários.
+    // Atualiza registros antigos com a referência vigente.
     ponto.expectedTime = referencias[indice].expectedTime;
     ponto.driveConfirmed=Boolean(mapa.confirmed[indice]);
     ponto.driveTime=mapa.timesByIndex[indice];
   });
+
+  // O intervalo entre os pontos 2 e 3 é exatamente 72 minutos.
+  // Se só um comprovante existe, calcula a referência faltante a partir
+  // do timestamp real; se ambos existem, preserva ambos e sinaliza divergência.
+  var p2 = registro.punches[1];
+  var p3 = registro.punches[2];
+  var duracao = config.breakDurationMinutes || 72;
+  registro.intervalGapMinutes = null;
+  registro.intervalGapWarning = false;
+
+  if (p2.driveConfirmed && !p3.driveConfirmed) {
+    p3.expectedTime = pg026_formatarMinutos_(
+      pg026_minutosHorario_(p2.driveTime) + duracao
+    );
+  } else if (!p2.driveConfirmed && p3.driveConfirmed) {
+    p2.expectedTime = pg026_formatarMinutos_(
+      pg026_minutosHorario_(p3.driveTime) - duracao
+    );
+  } else if (p2.driveConfirmed && p3.driveConfirmed) {
+    registro.intervalGapMinutes =
+      pg026_minutosHorario_(p3.driveTime) -
+      pg026_minutosHorario_(p2.driveTime);
+    registro.intervalGapWarning = registro.intervalGapMinutes !== duracao;
+  }
+
   registro.receiptTimes=timestamps.map(function(timestamp){
     return Utilities.formatDate(new Date(timestamp),TIME_ZONE,"HH:mm");
   });
@@ -371,9 +396,16 @@ function pg026_montarChecklist_(pendencias) {
       }
     });
 
+    if (registro.intervalGapWarning) {
+      linhas.push(
+        "⚠️ Intervalo entre P2 e P3: " + registro.intervalGapMinutes +
+        " minutos; esperado: 72 minutos."
+      );
+    }
+
     if (registro.unmatchedReceiptTimes && registro.unmatchedReceiptTimes.length) {
       linhas.push(
-        "Comprovante(s) fora da tolerância de horário: " +
+        "Comprovante(s) não associados: " +
         registro.unmatchedReceiptTimes.join(", ")
       );
     }
