@@ -812,7 +812,7 @@ function conferirPontoDiario() {
   }
 
   try {
-    executarConferenciaPonto_();
+    executarConferenciaCumulativa_();
   } finally {
     if (lock.hasLock()) {
       lock.releaseLock();
