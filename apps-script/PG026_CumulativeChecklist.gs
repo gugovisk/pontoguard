@@ -846,6 +846,56 @@ function executarTestesPG026() {
       }
     },
     {
+      nome: "Se P3 foi às 17:03, P2 pendente passa a ser 15:51",
+      executar: function() {
+        var registro = pg026_criarRegistroDia_("2099-12-28", false, config);
+        registro = pg026_atualizarRegistroComDrive_(registro, {
+          timestamps: [pg026_timestampTeste_("2099-12-28", "17:03")]
+        }, config);
+        pg026_exigirPG026_(registro.punches[2].driveTime === "17:03", "Timestamp real de P3 não foi preservado.");
+        pg026_exigirPG026_(registro.punches[1].expectedTime === "15:51", "P2 deveria ser calculado 72 minutos antes.");
+      }
+    },
+    {
+      nome: "Se P2 foi às 15:51, P3 pendente passa a ser 17:03",
+      executar: function() {
+        var registro = pg026_criarRegistroDia_("2099-12-29", false, config);
+        registro = pg026_atualizarRegistroComDrive_(registro, {
+          timestamps: [pg026_timestampTeste_("2099-12-29", "15:51")]
+        }, config);
+        pg026_exigirPG026_(registro.punches[1].driveTime === "15:51", "Timestamp real de P2 não foi preservado.");
+        pg026_exigirPG026_(registro.punches[2].expectedTime === "17:03", "P3 deveria ser calculado 72 minutos depois.");
+      }
+    },
+    {
+      nome: "Quando P2 e P3 existem, verifica o intervalo real de 72 minutos",
+      executar: function() {
+        var registro = pg026_criarRegistroDia_("2099-12-30", false, config);
+        registro = pg026_atualizarRegistroComDrive_(registro, {
+          timestamps: [
+            pg026_timestampTeste_("2099-12-30", "15:51"),
+            pg026_timestampTeste_("2099-12-30", "17:03")
+          ]
+        }, config);
+        pg026_exigirPG026_(registro.punches[1].driveTime === "15:51" && registro.punches[2].driveTime === "17:03", "Os timestamps reais devem prevalecer.");
+        pg026_exigirPG026_(registro.intervalGapMinutes === 72 && !registro.intervalGapWarning, "Intervalo de 72 minutos deveria ser validado.");
+      }
+    },
+    {
+      nome: "Intervalo diferente de 72 minutos gera aviso sem alterar timestamps",
+      executar: function() {
+        var registro = pg026_criarRegistroDia_("2099-12-31", false, config);
+        registro = pg026_atualizarRegistroComDrive_(registro, {
+          timestamps: [
+            pg026_timestampTeste_("2099-12-31", "15:51"),
+            pg026_timestampTeste_("2099-12-31", "17:05")
+          ]
+        }, config);
+        pg026_exigirPG026_(registro.intervalGapWarning, "Deveria sinalizar intervalo divergente.");
+        pg026_exigirPG026_(registro.punches[1].driveTime === "15:51" && registro.punches[2].driveTime === "17:05", "Os horários reais não podem ser alterados.");
+      }
+    },
+    {
       nome: "Quatro comprovantes identificam os quatro pontos",
       executar: function() {
         var ts = ["13:05","15:52","17:16","23:08"].map(function(h) {
