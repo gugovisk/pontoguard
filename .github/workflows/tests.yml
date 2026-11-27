@@ -20,5 +20,15 @@ jobs:
         with:
           node-version: 22
 
+
+      - name: Syntax-check Google Apps Script sources
+        run: |
+          for file in apps-script/*.gs; do
+            temp_file="$(mktemp --suffix=.js)"
+            cp "$file" "$temp_file"
+            node --check "$temp_file"
+            rm -f "$temp_file"
+          done
+
       - name: Run automated tests
         run: npm test
