@@ -74,7 +74,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 ### Not yet completed
 
 - [x] Review the first automatic execution log: the run processed 2026-11-23, identified it as a day off, skipped the reminder workflow, and released the execution lock. Because the day-off rule short-circuited the workflow, no Drive receipt count or Telegram decision was expected for this run.
-- [ ] Run the nine PG-026 manual Apps Script tests (`executarTestesPG026`).
+- [ ] Run the 13 PG-026 manual Apps Script test scenarios (`executarTestesPG026`).
 - [ ] Deploy the Apps Script project as a Web App (execute as the owner; access available to anyone) and run `configurarWebhookTelegram()` to enable checklist buttons.
 - [ ] Evaluate FolderSync delays over multiple workdays; the 2026-11-22 check is a single spot-check, not a timing/reliability study.
 - [ ] Operational monitoring and alerting improvements.
@@ -364,7 +364,7 @@ PG-026 uses these reference times by default: `13:00`, `15:48`, `17:00`, and `23
 
 To activate PG-026 after copying the updated Apps Script files:
 
-1. Run `executarTestesPG026()` and confirm all nine scenarios pass.
+1. Run `executarTestesPG026()` and confirm all 13 scenarios pass.
 2. In Apps Script, create a **Web App** deployment. Select **Execute as me** and **Who has access: Anyone**.
 3. Run `configurarWebhookTelegram()` once. It registers the callback webhook and generates `TELEGRAM_WEBHOOK_SECRET` in Script Properties.
 4. Keep the existing `conferirPontoDiario` daily trigger; its entry point now calls `executarConferenciaCumulativa_()`.
@@ -437,7 +437,7 @@ Known limitations include:
 
 ### Pending
 
-- [ ] Run and record the nine PG-026 manual Apps Script tests.
+- [ ] Run and record the 13 PG-026 manual Apps Script test scenarios.
 - [ ] Deploy the PG-026 Web App and configure the Telegram callback webhook.
 - [ ] Verify manual checklist confirmation, undo, cumulative reminders, and automatic resolution when Drive receipts arrive.
 - [ ] Perform broader concurrency and failure testing.
