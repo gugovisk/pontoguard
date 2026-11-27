@@ -765,90 +765,76 @@ function doPost(e) {
  * Não acessa Drive, Calendar, Telegram ou Script Properties.
  */
 function executarTestesPG026() {
+  var config = pg026_configuracao_();
   var testes = [
     {
-      nome: "3º ponto é calculado 72 minutos após 18:30",
+      nome: "Horários de referência são 13:00, 15:48, 17:00 e 23:00",
       executar: function() {
-        var config = {
-          start: "13:00",
-          breakStart: "18:30",
-          breakDuration: 72,
-          end: "23:00",
-          tolerance: 30
-        };
-        var horarios = pg026_horariosEsperados_(config);
-        pg026_exigirPG026_(horarios[2].expectedTime === "19:42", "Esperado 19:42.");
+        var horarios = pg026_horariosEsperados_(config).map(function(p){return p.expectedTime;});
+        pg026_exigirPG026_(horarios.join(",") === "13:00,15:48,17:00,23:00", "Referências incorretas.");
       }
     },
     {
-      nome: "Horário esperado aceita virada de hora",
+      nome: "Três comprovantes são associados cronologicamente e preservam seus timestamps",
       executar: function() {
-        pg026_exigirPG026_(pg026_somarHorario_("18:50", 72) === "20:02", "Esperado 20:02.");
-      }
-    },
-    {
-      nome: "Pontos 1, 2 e 4 são identificados com ponto 3 faltante",
-      executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
         var ts = [
-          pg026_timestampTeste_("2099-12-20", "13:02"),
-          pg026_timestampTeste_("2099-12-20", "18:28"),
-          pg026_timestampTeste_("2099-12-20", "23:04")
+          pg026_timestampTeste_("2099-12-20", "13:07"),
+          pg026_timestampTeste_("2099-12-20", "15:59"),
+          pg026_timestampTeste_("2099-12-20", "23:11")
         ];
         var mapa = pg026_mapearComprovantes_(ts, config);
         pg026_exigirPG026_(mapa.confirmed[0] && mapa.confirmed[1] && !mapa.confirmed[2] && mapa.confirmed[3], "Mapeamento incorreto.");
+        pg026_exigirPG026_(mapa.timesByIndex[0] === "13:07" && mapa.timesByIndex[1] === "15:59" && mapa.timesByIndex[3] === "23:11", "Timestamp real foi alterado.");
       }
     },
     {
-      nome: "Ponto 3 presente permite calcular o ponto 2 faltante",
+      nome: "Comprovante fora de tolerância continua sendo horário real",
       executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
-        var registro = pg026_criarRegistroDia_("2099-12-21", false, config);
-        registro = pg026_atualizarRegistroComDrive_(registro, {
-          timestamps:[pg026_timestampTeste_("2099-12-21","19:50")]
-        }, config);
-        pg026_exigirPG026_(registro.punches[2].driveConfirmed, "Ponto 3 deveria estar confirmado.");
-        pg026_exigirPG026_(registro.punches[1].expectedTime === "18:38", "Ponto 2 esperado deveria ser 18:38.");
+        var mapa = pg026_mapearComprovantes_([
+          pg026_timestampTeste_("2099-12-21", "16:42")
+        ], config);
+        pg026_exigirPG026_(mapa.confirmed[2], "Comprovante deveria ser associado ao ponto mais próximo.");
+        pg026_exigirPG026_(mapa.timesByIndex[2] === "16:42", "Horário real deveria ser preservado.");
       }
     },
     {
-      nome: "Ponto 2 presente calcula o retorno esperado",
+      nome: "Ponto sem comprovante mantém o horário de referência",
       executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
         var registro = pg026_criarRegistroDia_("2099-12-22", false, config);
         registro = pg026_atualizarRegistroComDrive_(registro, {
-          timestamps:[pg026_timestampTeste_("2099-12-22","18:41")]
+          timestamps: [pg026_timestampTeste_("2099-12-22","13:09")]
         }, config);
-        pg026_exigirPG026_(registro.punches[1].driveConfirmed, "Ponto 2 deveria estar confirmado.");
-        pg026_exigirPG026_(registro.punches[2].expectedTime === "19:53", "Ponto 3 esperado deveria ser 19:53.");
+        pg026_exigirPG026_(registro.punches[0].driveTime === "13:09", "Horário real não foi registrado.");
+        pg026_exigirPG026_(registro.punches[1].expectedTime === "15:48", "Referência do ponto 2 incorreta.");
+        pg026_exigirPG026_(registro.punches[2].expectedTime === "17:00", "Referência do ponto 3 incorreta.");
+        pg026_exigirPG026_(registro.punches[3].expectedTime === "23:00", "Referência do ponto 4 incorreta.");
       }
     },
     {
-      nome: "Quatro comprovantes satisfazem todos os pontos",
+      nome: "Quatro comprovantes identificam os quatro pontos",
       executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
-        var ts = ["13:00","18:30","19:42","23:00"].map(function(h) {
+        var ts = ["13:05","15:52","17:16","23:08"].map(function(h) {
           return pg026_timestampTeste_("2099-12-23",h);
         });
         var mapa = pg026_mapearComprovantes_(ts, config);
-        pg026_exigirPG026_(mapa.confirmed.every(function(valor){return valor;}), "Todos os quatro pontos deveriam ser confirmados.");
+        pg026_exigirPG026_(mapa.confirmed.every(function(valor){return valor;}), "Todos os pontos deveriam ser confirmados.");
+        pg026_exigirPG026_(mapa.timesByIndex.join(",") === "13:05,15:52,17:16,23:08", "Os horários reais não foram preservados.");
       }
     },
     {
-      nome: "Tolerância não associa um comprovante distante do horário",
+      nome: "Comprovantes excedentes não são usados duas vezes",
       executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
-        var mapa = pg026_mapearComprovantes_([
-          pg026_timestampTeste_("2099-12-24","16:00")
-        ], config);
-        pg026_exigirPG026_(!mapa.confirmed.some(function(valor){return valor;}), "O comprovante não deveria ser associado.");
-        pg026_exigirPG026_(mapa.unmatched.length === 1, "O horário deveria aparecer como não associado.");
+        var ts = ["13:00","15:48","17:00","20:00","23:00"].map(function(h) {
+          return pg026_timestampTeste_("2099-12-24",h);
+        });
+        var mapa = pg026_mapearComprovantes_(ts, config);
+        pg026_exigirPG026_(mapa.confirmed.every(function(valor){return valor;}), "Os quatro pontos deveriam estar confirmados.");
+        pg026_exigirPG026_(mapa.unmatched.length === 1, "O comprovante excedente deveria ser informado.");
       }
     },
     {
       nome: "Confirmação manual completa somente o ponto selecionado",
       executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
         var registro = pg026_criarRegistroDia_("2099-12-25", false, config);
         registro.punches[1].manualConfirmed = true;
         registro.complete = registro.punches.every(function(p){return p.driveConfirmed || p.manualConfirmed;});
@@ -859,11 +845,17 @@ function executarTestesPG026() {
     {
       nome: "Confirmação manual pode ser desfeita",
       executar: function() {
-        var config = { start:"13:00", breakStart:"18:30", breakDuration:72, end:"23:00", tolerance:30 };
         var registro = pg026_criarRegistroDia_("2099-12-26", false, config);
         registro.punches[0].manualConfirmed = true;
         registro.punches[0].manualConfirmed = false;
         pg026_exigirPG026_(!registro.punches[0].manualConfirmed, "Confirmação deveria ser desfeita.");
+      }
+    },
+    {
+      nome: "Dia de folga nasce completo sem exigir comprovantes",
+      executar: function() {
+        var registro = pg026_criarRegistroDia_("2099-12-27", true, config);
+        pg026_exigirPG026_(registro.complete, "Dia de folga deveria estar completo.");
       }
     }
   ];
@@ -878,16 +870,12 @@ function executarTestesPG026() {
       console.log("APROVADO: " + teste.nome);
     } catch (erro) {
       falhas.push(teste.nome + ": " + erro.message);
-      console.error("REPROVADO: " + teste.nome + " | " + erro.message);
+      console.error("REPROVADO: " + teste.nome + " — " + erro.message);
     }
   });
 
-  console.log("PG-026 — aprovados: " + aprovados + "/" + testes.length);
-
-  if (falhas.length) {
-    throw new Error(falhas.join("\n"));
-  }
-
+  console.log("PG-026 — " + aprovados + "/" + testes.length + " testes aprovados.");
+  if (falhas.length) throw new Error(falhas.join("\\n"));
   console.log("TODOS OS TESTES PG-026 FORAM APROVADOS.");
 }
 
