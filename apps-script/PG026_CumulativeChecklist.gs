@@ -227,7 +227,10 @@ function pg026_mapearComprovantes_(timestamps, config) {
 function pg026_atualizarRegistroComDrive_(registro,resumo,config){
   var timestamps=resumo?resumo.timestamps:[];
   var mapa=pg026_mapearComprovantes_(timestamps,config);
+  var referencias = pg026_horariosEsperados_(config);
   registro.punches.forEach(function(ponto,indice){
+    // Atualiza também registros persistidos antes da correção dos horários.
+    ponto.expectedTime = referencias[indice].expectedTime;
     ponto.driveConfirmed=Boolean(mapa.confirmed[indice]);
     ponto.driveTime=mapa.timesByIndex[indice];
   });
