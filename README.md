@@ -24,7 +24,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed; two automatic executions on working days confirmed receipt counting and successful Telegram delivery, alongside two day-off skips. Broader reliability and synchronization timing remain under observation.**
+**Current stage: PG-025 operational validation completed; PG-026 cumulative checklist and Telegram callback source added in a feature branch. PG-026 Apps Script tests, Web App deployment, and Telegram webhook activation are pending.**
 
 ### Implemented in the GitHub repository
 
@@ -58,6 +58,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 - [x] PG-025 manual Apps Script test suites: 27/27 passed (state transitions, receipt counting, day-off rules, and integrated simulated workflows).
 - [x] Drive folder spot-check on 2026-11-23: 119 unique valid receipts across 42 dates; zero ignored files and zero duplicate timestamps.
 - [x] FolderSync-to-Drive spot-check: the three receipt files present for 2026-11-22 on the phone were also present in the configured Drive folder.
+- [ ] PG-026 cumulative checklist: source code and nine manual Apps Script scenarios added in the feature branch; execution and operational activation remain pending.
 
 ### Current validation evidence
 
@@ -72,6 +73,8 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 ### Not yet completed
 
 - [x] Review the first automatic execution log: the run processed 2026-11-23, identified it as a day off, skipped the reminder workflow, and released the execution lock. Because the day-off rule short-circuited the workflow, no Drive receipt count or Telegram decision was expected for this run.
+- [ ] Run the nine PG-026 manual Apps Script tests (`executarTestesPG026`).
+- [ ] Deploy the Apps Script project as a Web App (execute as the owner; access available to anyone) and run `configurarWebhookTelegram()` to enable checklist buttons.
 - [ ] Evaluate FolderSync delays over multiple workdays; the 2026-11-22 check is a single spot-check, not a timing/reliability study.
 - [ ] Operational monitoring and alerting improvements.
 - [ ] Automated CI coverage for real Google and Telegram service integrations.
@@ -93,7 +96,10 @@ The intended operational workflow is:
 7. Unique receipts are counted for the analyzed workday.
 8. If fewer than four receipts are found on a working day, the system can send a Telegram reminder.
 9. Notification state is persisted to prevent unsafe repeated sends and to support manual reconciliation.
-10. A daily time-driven Apps Script trigger invokes the protected entry point. The Apps Script trigger screen displayed the execution window as 00:00–01:00 (`GMT-03:00`). The first automatic execution occurred on 2026-11-24 at 00:19:47 and processed 2026-11-23; subsequent executions on 2026-11-25, 2026-11-26, and 2026-11-27 processed the previous calendar dates. The 2026-11-25 run (processing 2026-11-24) and 2026-11-24 run (processing 2026-11-23) identified days off and skipped reminders. The 2026-11-26 run (processing 2026-11-25) and 2026-11-27 run (processing 2026-11-26) each counted three unique receipts and logged successful Telegram delivery with state `SENT` and one attempt. The entry point resolves midnight runs to the previous calendar date.
+10. A daily time-driven Apps Script trigger invokes the protected entry point. The Apps Script trigger screen displayed the execution window as 00:00–01:00 (`GMT-03:00`). The entry point resolves midnight runs to the previous calendar date.
+11. In PG-026, the same trigger scans every date from the cumulative start date through the last completed workday, preserves unresolved punch items, and sends one daily Telegram checklist while any date remains incomplete. The first cumulative start date is recovered from the oldest legacy `PONTOGUARD_NOTIFICATION_YYYY-MM-DD` record (or `ULTIMA_DATA_NOTIFICADA`); when no legacy alert exists, tracking starts with the first processed date.
+12. Telegram inline buttons let the user confirm that a missing punch was made manually. That confirmation is persisted per date and punch; the next checklist omits it. A manual confirmation can be undone while that date still has other pending punches. Drive receipts also resolve punches automatically.
+13. PG-026 expects the initial schedule 13:00, 18:30, 19:42, and 23:00 in `America/Sao_Paulo` (Brasília, currently UTC-3). Punches are associated with expected times using a configurable 30-minute tolerance. If only one of the two interval punches is found, the missing partner's expected time is calculated by adding or subtracting the configured interval duration (72 minutes by default). If both exist but their difference is not exactly the configured duration, the checklist reports the observed interval.
 
 The Apps Script checks the day-off condition before processing receipts. The production entry point uses a script lock so simultaneous executions do not process the protected operation at the same time.
 
@@ -232,7 +238,8 @@ pontoguard/
 │
 ├── apps-script/
 │   ├── Code.gs
-│   └── PG025_Tests.gs
+│   ├── PG025_Tests.gs
+│   └── PG026_CumulativeChecklist.gs
 │
 ├── src/
 │   ├── filenameParser.js
@@ -338,6 +345,7 @@ The sanitized production source and PG-025 manual test suite are versioned at:
 
 - `apps-script/Code.gs`
 - `apps-script/PG025_Tests.gs`
+- `apps-script/PG026_CumulativeChecklist.gs`
 
 The deployed Apps Script project uses Script Properties for sensitive configuration. The actual values must remain outside the public repository.
 
@@ -349,7 +357,25 @@ Expected property names include:
 
 Do not commit real values, tokens, chat identifiers, private folder IDs, or personal attendance data.
 
-The source code reads configuration from Script Properties. A daily time-driven trigger for `conferirPontoDiario` was installed on 2026-11-23. The installation log confirmed trigger creation and that zero previous triggers for this handler were removed. The Apps Script trigger screen displayed its execution window as 00:00–01:00 (`GMT-03:00`). The first automatic execution was confirmed on 2026-11-24 at 00:19:47, with the routine processing 2026-11-23. The exact business outcome of that run still needs to be recorded from its execution log.
+The source code reads configuration from Script Properties. A daily time-driven trigger for `conferirPontoDiario` was installed on 2026-11-23. The installation log confirmed trigger creation and that zero previous triggers for this handler were removed. The trigger's observed execution window is 00:00–01:00 (`GMT-03:00`). The current main-branch production path was validated in two working-day runs and two day-off skips.
+
+PG-026 adds these optional Script Properties (defaults shown):
+
+- `PUNCH_START_TIME`: `13:00`
+- `PUNCH_BREAK_START_TIME`: `18:30`
+- `PUNCH_BREAK_DURATION_MINUTES`: `72`
+- `PUNCH_END_TIME`: `23:00`
+- `PUNCH_TOLERANCE_MINUTES`: `30`
+- `TELEGRAM_WEBHOOK_SECRET`: generated automatically by `configurarWebhookTelegram()`
+
+To activate PG-026 after copying the updated Apps Script files:
+
+1. Run `executarTestesPG026()` and confirm all nine scenarios pass.
+2. In Apps Script, create a **Web App** deployment. Select **Execute as me** and **Who has access: Anyone**.
+3. Run `configurarWebhookTelegram()` once. It registers the callback webhook and generates `TELEGRAM_WEBHOOK_SECRET` in Script Properties.
+4. Keep the existing `conferirPontoDiario` daily trigger; its entry point now calls `executarConferenciaCumulativa_()`.
+
+The Web App endpoint checks the secret query parameter before accepting Telegram callback updates. `configurarWebhookTelegram()` refuses to replace a webhook that points to a different service URL.
 
 ## 12. Security and Privacy
 
@@ -377,6 +403,8 @@ Known limitations include:
 - Delayed FolderSync uploads may temporarily cause an undercount.
 - The Node.js workflow is not yet connected to real Google service adapters.
 - The Node.js notification store uses an injected adapter; its tests use an in-memory implementation.
+- PG-026 punch-to-slot matching uses a configurable tolerance (30 minutes by default). A receipt outside that tolerance is shown as unassociated rather than silently assigned to a punch.
+- Telegram checklist callbacks require a deployed Apps Script Web App and a configured webhook. The source code alone does not activate the Telegram buttons.
 - The Apps Script integration has separate persistence and locking logic.
 - The manual concurrency test validates a controlled two-execution scenario, not high-load behavior.
 - Uncertain Telegram delivery results require reconciliation before retrying.
@@ -410,9 +438,13 @@ Known limitations include:
 - [x] Confirm the first automatic execution on 2026-11-24 at 00:19:47, processing the previous date (2026-11-23).
 - [x] Confirm subsequent automatic executions on 2026-11-25 and 2026-11-26 correctly skipped day-off reminders.
 - [x] Confirm automatic working-day executions on 2026-11-26 and 2026-11-27 each counted three unique receipts and logged successful Telegram delivery (`SENT`, one attempt).
+- [ ] Add cumulative per-day punch state and Telegram interactive checklist (PG-026 source added; manual tests and deployment pending).
 
 ### Pending
 
+- [ ] Run and record the nine PG-026 manual Apps Script tests.
+- [ ] Deploy the PG-026 Web App and configure the Telegram callback webhook.
+- [ ] Verify manual checklist confirmation, undo, cumulative reminders, and automatic resolution when Drive receipts arrive.
 - [ ] Perform broader concurrency and failure testing.
 - [ ] Complete end-to-end validation with real services.
 - [ ] Evaluate FolderSync synchronization delays and define a safe verification window.
