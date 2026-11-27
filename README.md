@@ -99,7 +99,7 @@ The intended operational workflow is:
 10. A daily time-driven Apps Script trigger invokes the protected entry point. The Apps Script trigger screen displayed the execution window as 00:00–01:00 (`GMT-03:00`). The entry point resolves midnight runs to the previous calendar date.
 11. In PG-026, the same trigger scans every date from the cumulative start date through the last completed workday, preserves unresolved punch items, and sends one daily Telegram checklist while any date remains incomplete. The first cumulative start date is recovered from the oldest legacy `PONTOGUARD_NOTIFICATION_YYYY-MM-DD` record (or `ULTIMA_DATA_NOTIFICADA`); when no legacy alert exists, tracking starts with the first processed date.
 12. Telegram inline buttons let the user confirm that a missing punch was made manually. That confirmation is persisted per date and punch; the next checklist omits it. A manual confirmation can be undone while that date still has other pending punches. Drive receipts also resolve punches automatically.
-13. PG-026 expects the initial schedule 13:00, 18:30, 19:42, and 23:00 in `America/Sao_Paulo` (Brasília, currently UTC-3). Punches are associated with expected times using a configurable 30-minute tolerance. If only one of the two interval punches is found, the missing partner's expected time is calculated by adding or subtracting the configured interval duration (72 minutes by default). If both exist but their difference is not exactly the configured duration, the checklist reports the observed interval.
+13. PG-026 uses reference times 13:00, 15:48, 17:00, and 23:00 in `America/Sao_Paulo` (Brasília, UTC-3). The 13-digit Unix timestamp in each valid receipt filename is the source of truth for the actual punch time; it is never replaced by a scheduled time or rejected for being outside a tolerance. When a punch has no associated receipt, the checklist reports its corresponding reference time. With fewer than four receipts, chronological matching selects the ordered set of reference slots that minimizes total time distance; the real timestamp remains displayed/stored for every matched receipt.
 
 The Apps Script checks the day-off condition before processing receipts. The production entry point uses a script lock so simultaneous executions do not process the protected operation at the same time.
 
@@ -359,14 +359,7 @@ Do not commit real values, tokens, chat identifiers, private folder IDs, or pers
 
 The source code reads configuration from Script Properties. A daily time-driven trigger for `conferirPontoDiario` was installed on 2026-11-23. The installation log confirmed trigger creation and that zero previous triggers for this handler were removed. The trigger's observed execution window is 00:00–01:00 (`GMT-03:00`). The current main-branch production path was validated in two working-day runs and two day-off skips.
 
-PG-026 adds these optional Script Properties (defaults shown):
-
-- `PUNCH_START_TIME`: `13:00`
-- `PUNCH_BREAK_START_TIME`: `18:30`
-- `PUNCH_BREAK_DURATION_MINUTES`: `72`
-- `PUNCH_END_TIME`: `23:00`
-- `PUNCH_TOLERANCE_MINUTES`: `30`
-- `TELEGRAM_WEBHOOK_SECRET`: generated automatically by `configurarWebhookTelegram()`
+PG-026 uses these reference times by default: `13:00`, `15:48`, `17:00`, and `23:00`. The schedule is defined in `pg026_configuracao_()` and can be changed there if the work shift changes. `TELEGRAM_WEBHOOK_SECRET` is generated automatically by `configurarWebhookTelegram()`.
 
 To activate PG-026 after copying the updated Apps Script files:
 
@@ -403,7 +396,7 @@ Known limitations include:
 - Delayed FolderSync uploads may temporarily cause an undercount.
 - The Node.js workflow is not yet connected to real Google service adapters.
 - The Node.js notification store uses an injected adapter; its tests use an in-memory implementation.
-- PG-026 punch-to-slot matching uses a configurable tolerance (30 minutes by default). A receipt outside that tolerance is shown as unassociated rather than silently assigned to a punch.
+- PG-026 maps timestamps chronologically to the closest ordered reference slots. If actual punches deviate significantly from the reference times, the inferred missing slot can be ambiguous; review the checklist against the actual punch records.
 - Telegram checklist callbacks require a deployed Apps Script Web App and a configured webhook. The source code alone does not activate the Telegram buttons.
 - The Apps Script integration has separate persistence and locking logic.
 - The manual concurrency test validates a controlled two-execution scenario, not high-load behavior.
