@@ -356,7 +356,7 @@ function pg026_obterOuDefinirInicio_(dataAlvo) {
     var datasHistoricas = [];
 
     Object.keys(todas).forEach(function(nome) {
-      var match = nome.match(/^PONTOGUARD_NOTIFICATION_(\\d{4}-\\d{2}-\\d{2})$/);
+      var match = nome.match(/^PONTOGUARD_NOTIFICATION_(\d{4}-\d{2}-\d{2})$/);
       if (match && match[1] <= dataAlvo) datasHistoricas.push(match[1]);
     });
 
