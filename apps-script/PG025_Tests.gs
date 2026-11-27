@@ -998,3 +998,14 @@ function executarTestesIntegradosPG025() {
   console.log("====================================");
   console.log("RESULTADO FINAL");
   console.log("Aprovados: " + aprovados + "/" + testes.length);
+  console.log("Reprovados: " + falhas.length);
+  console.log("====================================");
+
+  if (falhas.length > 0) {
+    throw new Error(
+      "PG-025B: " + falhas.length + " teste(s) integrado(s) reprovado(s)."
+    );
+  }
+
+  console.log("TODOS OS TESTES INTEGRADOS PG-025 FORAM APROVADOS.");
+}
