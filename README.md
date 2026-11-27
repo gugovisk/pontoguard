@@ -24,7 +24,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed; three automatic executions on working days confirmed receipt counting and successful Telegram delivery, alongside two day-off skips. Broader reliability and synchronization timing remain under observation.**
+**Current stage: Core and Apps Script integration implemented; PG-025 manual test suites passed (27/27); Drive synchronization spot-check completed; daily trigger installed; two automatic executions on working days confirmed receipt counting and successful Telegram delivery, alongside two day-off skips. Broader reliability and synchronization timing remain under observation.**
 
 ### Implemented in the GitHub repository
 
