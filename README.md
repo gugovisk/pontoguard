@@ -24,7 +24,7 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 
 ## 2. Project Status
 
-**Current stage: PG-025 operational validation completed; PG-026 cumulative checklist and Telegram callback source added in a feature branch. PG-026 Apps Script tests, Web App deployment, and Telegram webhook activation are pending.**
+**Current stage: PG-026 cumulative checklist and Telegram callback implementation merged into `main`. PG-026 Apps Script tests, Web App deployment, and Telegram webhook activation are pending.**
 
 ### Implemented in the GitHub repository
 
@@ -58,7 +58,8 @@ PontoGuard is a personal reminder tool. It does not replace an official attendan
 - [x] PG-025 manual Apps Script test suites: 27/27 passed (state transitions, receipt counting, day-off rules, and integrated simulated workflows).
 - [x] Drive folder spot-check on 2026-11-23: 119 unique valid receipts across 42 dates; zero ignored files and zero duplicate timestamps.
 - [x] FolderSync-to-Drive spot-check: the three receipt files present for 2026-11-22 on the phone were also present in the configured Drive folder.
-- [ ] PG-026 cumulative checklist: source code and nine manual Apps Script scenarios added in the feature branch; execution and operational activation remain pending.
+- [x] PG-026 cumulative checklist and Telegram callback source merged into `main` (PR #17).
+- [ ] PG-026 manual Apps Script scenarios executed in the real Apps Script project; Web App deployment and webhook activation remain pending.
 
 ### Current validation evidence
 
@@ -431,7 +432,8 @@ Known limitations include:
 - [x] Confirm the first automatic execution on 2026-11-24 at 00:19:47, processing the previous date (2026-11-23).
 - [x] Confirm subsequent automatic executions on 2026-11-25 and 2026-11-26 correctly skipped day-off reminders.
 - [x] Confirm automatic working-day executions on 2026-11-26 and 2026-11-27 each counted three unique receipts and logged successful Telegram delivery (`SENT`, one attempt).
-- [ ] Add cumulative per-day punch state and Telegram interactive checklist (PG-026 source added; manual tests and deployment pending).
+- [x] Add cumulative per-day punch state and Telegram interactive checklist (PG-026; merged via PR #17).
+- [ ] Validate PG-026 in the real Apps Script project and activate the Telegram callback webhook.
 
 ### Pending
 
